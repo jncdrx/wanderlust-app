@@ -3198,15 +3198,23 @@ app.get('/api/destinations/saved', authenticateToken, async (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(__dirname, '../dist');
   if (fs.existsSync(distPath)) {
+    // Serve static assets (JS, CSS, images, etc.)
     app.use(express.static(distPath));
     
-    // Serve React app for all non-API routes
-    app.get('*', (req, res) => {
-      // Don't serve index.html for API routes
+    // Serve React app for all non-API routes (catch-all for React Router)
+    // This must be after all API routes and static file serving
+    app.use((req, res, next) => {
+      // Skip API routes
       if (req.path.startsWith('/api')) {
-        return res.status(404).json({ error: 'API endpoint not found' });
+        return next();
       }
-      res.sendFile(path.join(distPath, 'index.html'));
+      // Serve index.html for React Router
+      res.sendFile(path.join(distPath, 'index.html'), (err) => {
+        if (err) {
+          console.error('Error sending index.html:', err);
+          res.status(404).send('File not found');
+        }
+      });
     });
     
     console.log('📦 Serving static files from:', distPath);
