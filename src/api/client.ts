@@ -76,20 +76,35 @@ const resolveApiBaseUrl = () => {
     return envBase.endsWith('/') ? envBase.slice(0, -1) : envBase;
   }
 
-  // If running on ngrok, use the same ngrok domain for backend
+  // If running in production (on Render or other hosting), use same origin
   if (typeof window !== 'undefined') {
     const currentOrigin = window.location.origin;
+    
+    // Detect production environments
+    const isProduction = 
+      currentOrigin.includes('.onrender.com') ||
+      currentOrigin.includes('.vercel.app') ||
+      currentOrigin.includes('.netlify.app') ||
+      currentOrigin.includes('.railway.app') ||
+      currentOrigin.includes('.fly.dev') ||
+      !currentOrigin.includes('localhost') && !currentOrigin.includes('127.0.0.1');
+    
+    // If in production, use same origin (backend serves both API and frontend)
+    if (isProduction) {
+      return `${currentOrigin}/api`;
+    }
+    
+    // If running on ngrok, use the same ngrok domain for backend
     const isNgrok = currentOrigin.includes('.ngrok-free.dev') || currentOrigin.includes('.ngrok.io');
     
     if (isNgrok) {
       // Use the same ngrok domain for backend (assuming backend is on same tunnel or separate ngrok)
       // If backend is on a separate ngrok tunnel, set VITE_API_URL environment variable
-      const base = `${currentOrigin}/api`;
-      return base;
+      return `${currentOrigin}/api`;
     }
   }
 
-  // Default to localhost
+  // Default to localhost for local development
   return 'http://localhost:4001/api';
 };
 
