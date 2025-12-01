@@ -598,9 +598,16 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
-app.get('/', (req, res) => {
-  res.json({ message: 'Travel API is running!' });
-});
+// Root route - only in development (production serves React app)
+// In production, static file serving handles the root route
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/', (req, res) => {
+    res.json({ message: 'Travel API is running!' });
+  });
+} else {
+  // In production, log that root route is handled by static files
+  console.log('📦 Root route (/) will be served by static files in production');
+}
 
 // Database initialization
 async function initializeDatabase() {
@@ -3197,27 +3204,38 @@ app.get('/api/destinations/saved', authenticateToken, async (req, res) => {
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(__dirname, '../dist');
+  console.log('📦 Checking for static files at:', distPath);
+  console.log('📦 Directory exists:', fs.existsSync(distPath));
+  
   if (fs.existsSync(distPath)) {
-    // Serve static assets (JS, CSS, images, etc.)
-    app.use(express.static(distPath));
+    // Serve static assets (JS, CSS, images, etc.) - must be before catch-all
+    app.use(express.static(distPath, {
+      maxAge: '1y', // Cache static assets
+      etag: true
+    }));
     
-    // Serve React app for all non-API routes (catch-all for React Router)
-    // This must be after all API routes and static file serving
+    // Catch-all handler: serve index.html for all non-API routes (React Router)
+    // This MUST be the last route handler
     app.use((req, res, next) => {
-      // Skip API routes
+      // Skip API routes - let them return 404 if not found
       if (req.path.startsWith('/api')) {
         return next();
       }
-      // Serve index.html for React Router
-      res.sendFile(path.join(distPath, 'index.html'), (err) => {
+      // Serve index.html for all other routes (React Router handles routing)
+      const indexPath = path.join(distPath, 'index.html');
+      console.log('📦 Serving index.html for path:', req.path);
+      res.sendFile(indexPath, (err) => {
         if (err) {
-          console.error('Error sending index.html:', err);
-          res.status(404).send('File not found');
+          console.error('❌ Error sending index.html:', err);
+          res.status(500).send('Error loading application');
         }
       });
     });
     
-    console.log('📦 Serving static files from:', distPath);
+    console.log('✅ Static files configured from:', distPath);
+  } else {
+    console.error('❌ Static files directory not found:', distPath);
+    console.error('❌ Make sure to run "npm run build" before deploying');
   }
 }
 
