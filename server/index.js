@@ -156,11 +156,16 @@ const normalizeTripRecord = (trip) => {
   }
 };
 
-// Enhanced CORS configuration
-app.use(cors({
+// Enhanced CORS configuration - only apply to API routes
+// Static files don't need CORS (same-origin)
+app.use('/api', cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
+    
+    // Get Render URL from environment or allow any onrender.com domain
+    const renderUrl = process.env.RENDER_EXTERNAL_URL || process.env.RENDER_URL;
+    const isRenderDomain = origin.includes('.onrender.com');
     
     const allowedOrigins = [
       'http://localhost:5173',
@@ -168,10 +173,16 @@ app.use(cors({
       'https://untaxing-invertible-brittny.ngrok-free.dev',
     ];
     
+    // Add Render URL if available
+    if (renderUrl) {
+      allowedOrigins.push(renderUrl);
+    }
+    
     // Allow any ngrok domain
     const isNgrok = origin.includes('.ngrok-free.dev') || origin.includes('.ngrok.io');
     
-    if (allowedOrigins.includes(origin) || isNgrok) {
+    // Allow Render domains and same-origin requests
+    if (allowedOrigins.includes(origin) || isNgrok || isRenderDomain) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
