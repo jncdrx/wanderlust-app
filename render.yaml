@@ -16,7 +16,7 @@ services:
       - key: PORT
         value: 4001
       - key: TRUSTED_ORIGINS
-        value: https://wanderlust-app.onrender.com
+        value: https://wanderlust-app-2-053p.onrender.com
 
 databases:
   - name: wanderlust_db
