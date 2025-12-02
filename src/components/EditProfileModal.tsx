@@ -85,12 +85,12 @@ export function EditProfileModal({
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+      // Allow body scrolling on mobile - don't lock it
+      // This allows both modal and background to scroll
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
     };
   }, [isOpen, isLoading, onClose]);
 
@@ -137,10 +137,12 @@ export function EditProfileModal({
   }, [firstName]);
 
   // Check if there are actual changes
+  // For profilePhoto: empty string means remove, so compare with original
+  const profilePhotoChanged = profilePhoto !== originalValues.profilePhoto;
   const hasChanges = 
     firstName.trim() !== originalValues.firstName ||
     lastName.trim() !== originalValues.lastName ||
-    profilePhoto !== originalValues.profilePhoto ||
+    profilePhotoChanged ||
     photoFile !== null;
 
   const handleFileChange = async (file: File) => {
@@ -210,10 +212,16 @@ export function EditProfileModal({
   };
 
   const handleRemovePhoto = () => {
+    // Set profile photo to empty string to remove it
+    // This will trigger a re-render and hide the photo immediately
     setProfilePhoto('');
     setPhotoFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+    // Clear any photo errors
+    if (errors.photo) {
+      setErrors({ ...errors, photo: '' });
     }
   };
 
@@ -224,26 +232,45 @@ export function EditProfileModal({
 
     try {
       const userEmail = currentUser?.email || '';
-      const finalPhotoUrl = profilePhoto || '';
+      
+      // Prepare profile photo update
+      // Always send profilePhoto if it changed (including when removed - send empty string)
+      const profilePhotoChanged = profilePhoto !== originalValues.profilePhoto;
       
       if (currentUser?.id) {
-        const response = await apiClient.updateProfile(currentUser.id, {
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          email: userEmail, // Keep existing email
-          profilePhoto: finalPhotoUrl,
-        });
+        // Build update payload - only include defined values
+        const updatePayload: { firstName?: string; lastName?: string; email?: string; profilePhoto?: string } = {};
+        
+        // Always include firstName and lastName (they're required fields)
+        updatePayload.firstName = firstName.trim();
+        updatePayload.lastName = lastName.trim();
+        
+        // Only include profilePhoto if it changed - empty string means remove
+        if (profilePhotoChanged) {
+          updatePayload.profilePhoto = profilePhoto || ''; // Send empty string to remove photo
+        }
+        
+        // Filter out any undefined values before sending
+        const filteredPayload = Object.fromEntries(
+          Object.entries(updatePayload).filter(([_, value]) => value !== undefined)
+        );
+        
+        const response = await apiClient.updateProfile(currentUser.id, filteredPayload);
 
         centeredToast.success('Profile updated!', {
           description: 'Your changes have been saved'
         });
+        
+        // Get the updated profile photo - use the response value directly
+        // If null or empty string, it means photo was removed
+        const updatedProfilePhoto = response.user.profilePhoto || null;
         
         if (onProfileUpdated) {
           onProfileUpdated({
             firstName: response.user.firstName || firstName,
             lastName: response.user.lastName || lastName,
             email: response.user.email || userEmail,
-            profilePhoto: response.user.profilePhoto || finalPhotoUrl,
+            profilePhoto: updatedProfilePhoto, // null or empty string means photo was removed
           });
         }
         
@@ -251,7 +278,7 @@ export function EditProfileModal({
         setOriginalValues({ 
           firstName: firstName.trim(), 
           lastName: lastName.trim(),
-          profilePhoto: response.user.profilePhoto || finalPhotoUrl
+          profilePhoto: updatedProfilePhoto || ''
         });
         setPhotoFile(null);
         onClose();
@@ -263,7 +290,7 @@ export function EditProfileModal({
         setOriginalValues({ 
           firstName: firstName.trim(), 
           lastName: lastName.trim(),
-          profilePhoto: finalPhotoUrl
+          profilePhoto: profilePhoto || ''
         });
         setPhotoFile(null);
         onClose();
@@ -334,10 +361,14 @@ export function EditProfileModal({
           
           {/* Modal */}
           <div 
-            className="fixed inset-0 flex items-center justify-center p-4"
+            className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto"
             style={{
               zIndex: 10000,
               pointerEvents: 'none',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+              paddingTop: '2rem',
+              paddingBottom: '2rem',
             }}
             data-modal-content
           >
@@ -357,7 +388,9 @@ export function EditProfileModal({
                   ? '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
                   : '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
                 pointerEvents: 'auto',
-                maxHeight: '90vh',
+                maxHeight: '90dvh',
+                minHeight: '400px',
+                margin: 'auto',
               }}
               role="dialog"
               aria-modal="true"
@@ -414,6 +447,11 @@ export function EditProfileModal({
             style={{
               WebkitOverflowScrolling: 'touch',
               overscrollBehavior: 'contain',
+              touchAction: 'pan-y',
+            }}
+            onTouchStart={(e) => {
+              // Allow touch events to propagate for proper scrolling
+              e.stopPropagation();
             }}
           >
             {/* Personal Information Card */}
@@ -514,15 +552,22 @@ export function EditProfileModal({
                   {hasPhoto && (
                     <motion.button
                       type="button"
-                      onClick={handleRemovePhoto}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleRemovePhoto();
+                      }}
                       disabled={isUploadingPhoto || isLoading}
                       className={`w-full py-2 px-4 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all ${
-                        darkMode
-                          ? 'text-white/70 hover:text-white hover:bg-white/10 border border-white/20'
-                          : 'text-[#1a1a2e]/70 hover:text-[#1a1a2e] hover:bg-black/5 border border-black/10'
-                      } disabled:opacity-50`}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                        isUploadingPhoto || isLoading
+                          ? 'opacity-50 cursor-not-allowed'
+                          : darkMode
+                            ? 'text-white/70 hover:text-white hover:bg-white/10 border border-white/20 cursor-pointer active:scale-95'
+                            : 'text-[#1a1a2e]/70 hover:text-[#1a1a2e] hover:bg-black/5 border border-black/10 cursor-pointer active:scale-95'
+                      }`}
+                      whileHover={!isUploadingPhoto && !isLoading ? { scale: 1.02 } : {}}
+                      whileTap={!isUploadingPhoto && !isLoading ? { scale: 0.98 } : {}}
+                      aria-label="Remove profile photo"
                     >
                       <XIcon size={16} />
                       Remove photo

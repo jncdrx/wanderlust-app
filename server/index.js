@@ -10,10 +10,37 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const postgres = require('postgres');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const { randomUUID } = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+
+// Security middleware
+const { securityHeaders, customSecurityHeaders } = require('./middleware/security');
+const { loginRateLimiter, apiRateLimiter, trackFailedAttempt, isLocked, getLockInfo, resetFailedAttempts, clearAllRateLimits, getRateLimitStore } = require('./middleware/rateLimiter');
+const { loginValidation, registerValidation, handleValidationErrors, sanitizeBody } = require('./middleware/validation');
+const {
+  generateAccessToken,
+  generateRefreshToken,
+  hashPassword,
+  verifyPassword,
+  authenticateToken,
+  verifyRefreshToken,
+  setRefreshTokenCookie,
+  clearRefreshTokenCookie,
+} = require('./middleware/auth');
+const {
+  logFailedLogin,
+  logSuccessfulLogin,
+  logRegistration,
+  logTokenRefresh,
+  logSuspiciousActivity,
+  requestLogger,
+  getClientIP,
+  getUserAgent,
+} = require('./middleware/logging');
+const { generateCSRF, verifyCSRF } = require('./middleware/csrf');
 // Using Gemini API via fetch (no SDK needed)
 
 const app = express();
@@ -156,9 +183,8 @@ const normalizeTripRecord = (trip) => {
   }
 };
 
-// Enhanced CORS configuration - only apply to API routes
-// Static files don't need CORS (same-origin)
-app.use('/api', cors({
+// CORS configuration function - reusable for both API and uploads routes
+const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
@@ -191,13 +217,357 @@ app.use('/api', cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
-}));
+};
 
+// CORS helper function to check if origin is allowed
+const isOriginAllowed = (origin) => {
+  if (!origin) {
+    console.log('[CORS] No origin header - allowing (same-origin request)');
+    return true; // Allow requests with no origin (same-origin or mobile apps)
+  }
+  
+  const renderUrl = process.env.RENDER_EXTERNAL_URL || process.env.RENDER_URL;
+  const isRenderDomain = origin.includes('.onrender.com');
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://untaxing-invertible-brittny.ngrok-free.dev',
+  ];
+  if (renderUrl) {
+    allowedOrigins.push(renderUrl);
+  }
+  const isNgrok = origin.includes('.ngrok-free.dev') || origin.includes('.ngrok.io');
+  
+  const isAllowed = allowedOrigins.includes(origin) || isNgrok || isRenderDomain;
+  console.log(`[CORS] Origin check: ${origin} - Allowed: ${isAllowed} (in list: ${allowedOrigins.includes(origin)}, ngrok: ${isNgrok}, render: ${isRenderDomain})`);
+  
+  return isAllowed;
+};
+
+// Register image routes BEFORE security headers to have full control over headers
+// This prevents security headers from interfering with image loading
+
+// CORS configuration specifically for image serving
+const imageCorsOptions = {
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'OPTIONS'],
+  allowedHeaders: ['Content-Type']
+};
+
+// Debug middleware to log ALL requests to /uploads/images
+// Also override security headers that might block image loading
+app.use('/uploads/images', (req, res, next) => {
+  console.log(`[DEBUG] Request to /uploads/images: ${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
+  console.log(`[DEBUG] Request URL: ${req.url}`);
+  console.log(`[DEBUG] Request path: ${req.path}`);
+  
+  // Remove Cross-Origin-Resource-Policy header if it was set by security middleware
+  // This header can block cross-origin image loading in <img> tags
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  
+  next();
+});
+
+// Custom image serving route with explicit CORS headers
+// This route MUST be registered BEFORE the static middleware to ensure it's matched first
+app.get('/uploads/images/:filename', cors(imageCorsOptions), (req, res) => {
+  const origin = req.headers.origin;
+  const referer = req.headers.referer;
+  const filename = req.params.filename;
+  const filePath = path.join(IMAGES_DIR, filename);
+  
+  console.log(`[IMAGE] ✅ ROUTE HANDLER HIT - GET /uploads/images/${filename} - Origin: ${origin || 'none'}, Referer: ${referer || 'none'}`);
+  
+  // For images loaded in <img> tags, they don't send Origin header
+  // So we need to be more permissive - allow requests without origin or from known origins
+  const shouldAllowRequest = !origin || isOriginAllowed(origin);
+  
+  // Set CORS headers FIRST before any other headers
+  if (shouldAllowRequest) {
+    if (origin) {
+      // Request has origin header - set specific origin
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else {
+      // No origin header (image request from <img> tag) - allow all
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+  
+  // Disable caching to prevent stale responses with wrong CORS headers
+  // Must be set before checking file existence
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  
+  // Explicitly remove headers that block cross-origin image loading
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  res.removeHeader('Cross-Origin-Embedder-Policy');
+  
+  // Check if file exists
+  if (!fs.existsSync(filePath)) {
+    console.log(`[IMAGE] File not found: ${filePath}`);
+    // Still set CORS headers even for 404
+    if (shouldAllowRequest) {
+      if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      } else {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      }
+    }
+    return res.status(404).json({ error: 'Image not found' });
+  }
+  
+  // Determine content type based on file extension
+  const ext = path.extname(filename).toLowerCase();
+  const contentTypes = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml'
+  };
+  const contentType = contentTypes[ext] || 'application/octet-stream';
+  
+  // Read file and send with full control over headers
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      console.error('[IMAGE] Error reading image file:', err);
+      // Set CORS headers even for errors
+      if (shouldAllowRequest) {
+        if (origin) {
+          res.setHeader('Access-Control-Allow-Origin', origin);
+          res.setHeader('Access-Control-Allow-Credentials', 'true');
+        } else {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+        }
+      }
+      return res.status(500).json({ error: 'Error reading image file' });
+    }
+    
+    // Set headers before sending
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', data.length);
+    
+    // Re-assert CORS headers before sending (in case they were cleared)
+    if (shouldAllowRequest) {
+      if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      } else {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      }
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      // Explicitly remove CORP header
+      res.removeHeader('Cross-Origin-Resource-Policy');
+      res.removeHeader('Cross-Origin-Embedder-Policy');
+    }
+    
+    console.log(`[IMAGE] Sending image: ${filename} (${data.length} bytes) with Content-Type: ${contentType}`);
+    res.send(data);
+  });
+});
+
+// Handle OPTIONS preflight requests for /uploads/images
+app.options('/uploads/images/:filename', cors(imageCorsOptions), (req, res) => {
+  const origin = req.headers.origin;
+  console.log(`[CORS] OPTIONS /uploads/images/${req.params.filename} - Origin: ${origin || 'none'}`);
+  
+  const shouldAllowRequest = !origin || isOriginAllowed(origin);
+  
+  if (shouldAllowRequest) {
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    return res.status(200).end();
+  } else {
+    return res.status(403).json({ error: 'Not allowed by CORS' });
+  }
+});
+
+// Apply security headers globally (after image routes)
+app.use(securityHeaders);
+app.use(customSecurityHeaders);
+
+// Override security headers for image routes AFTER security middleware
+// This ensures images can be loaded cross-origin and prevents cached responses with wrong headers
+app.use('/uploads/images', (req, res, next) => {
+  // Remove headers that block cross-origin image loading
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  res.removeHeader('Cross-Origin-Embedder-Policy');
+  
+  // Prevent caching to avoid stale responses with wrong CORS headers
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  
+  // Ensure CORS headers are always set
+  const origin = req.headers.origin;
+  const shouldAllow = !origin || isOriginAllowed(origin);
+  
+  if (shouldAllow) {
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+  
+  next();
+});
+
+// Cookie parser for refresh tokens
+app.use(cookieParser());
+
+// Request logging middleware
+app.use(requestLogger);
+
+// Body parsing with size limits
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
-// Serve uploaded images statically
-app.use('/uploads', express.static(UPLOADS_DIR));
+// Sanitize all request bodies
+app.use(sanitizeBody);
+
+// Enhanced CORS configuration for API routes - only trusted domains
+const trustedOrigins = process.env.TRUSTED_ORIGINS 
+  ? process.env.TRUSTED_ORIGINS.split(',').map(origin => origin.trim())
+  : [
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ];
+
+// Add production URLs if available
+const renderUrl = process.env.RENDER_EXTERNAL_URL || process.env.RENDER_URL;
+if (renderUrl) {
+  trustedOrigins.push(renderUrl);
+}
+
+const secureCorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests) in development
+    if (!origin && process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    
+    if (!origin) {
+      return callback(new Error('CORS: Origin required in production'));
+    }
+    
+    // Check if origin is in trusted list
+    if (trustedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // Log suspicious CORS attempts
+      logSuspiciousActivity({ headers: { origin } }, 'CORS_VIOLATION', { origin });
+      callback(new Error('Not allowed by CORS policy'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  exposedHeaders: ['X-CSRF-Token'],
+};
+
+app.use('/api', cors(secureCorsOptions));
+
+// Development endpoint to reset rate limits - MUST be BEFORE rate limiter
+if (process.env.NODE_ENV !== 'production') {
+  app.post('/api/dev/reset-rate-limits', (req, res) => {
+    try {
+      clearAllRateLimits();
+      // Also clear any express-rate-limit stores
+      const store = getRateLimitStore();
+      if (store && typeof store.resetAll === 'function') {
+        store.resetAll();
+      }
+      res.json({ message: 'All rate limits cleared successfully' });
+    } catch (error) {
+      console.error('❌ Error clearing rate limits:', error);
+      res.status(500).json({ error: 'Failed to clear rate limits' });
+    }
+  });
+  
+  // Also allow GET for easy browser access
+  app.get('/api/dev/reset-rate-limits', (req, res) => {
+    try {
+      clearAllRateLimits();
+      const store = getRateLimitStore();
+      if (store && typeof store.resetAll === 'function') {
+        store.resetAll();
+      }
+      res.json({ message: 'All rate limits cleared successfully' });
+    } catch (error) {
+      console.error('❌ Error clearing rate limits:', error);
+      res.status(500).json({ error: 'Failed to clear rate limits' });
+    }
+  });
+}
+
+// Apply general API rate limiting (disabled in development)
+if (process.env.NODE_ENV === 'production' || process.env.ENABLE_RATE_LIMIT === 'true') {
+  app.use('/api', apiRateLimiter);
+} else {
+  // In development, completely bypass rate limiting
+  console.log('⚠️  API rate limiting DISABLED in development mode');
+}
+
+// Note: CSRF protection is applied per-route for state-changing operations
+// See individual route handlers for CSRF implementation
+
+// IMPORTANT: Image routes are already registered BEFORE security headers (see above)
+// Do NOT use static middleware for /uploads/images/*
+// Our custom route handler above handles all image requests with proper CORS
+// Only serve other files in /uploads statically (if any)
+const staticUploads = express.static(UPLOADS_DIR, {
+  setHeaders: (res, filePath, stat) => {
+    const origin = res.req?.headers?.origin;
+    if (isOriginAllowed(origin)) {
+      if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      } else {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      }
+    }
+  }
+});
+
+// Only apply static middleware to /uploads if it's NOT an image request
+app.use('/uploads', (req, res, next) => {
+  // If this is an image request, skip static middleware - our route handler will catch it
+  if (req.path.startsWith('/images/')) {
+    console.log(`[STATIC] Skipping static middleware for image request: ${req.path}`);
+    return next(); // Continue to next middleware/route handler
+  }
+  // For non-image uploads, use static middleware
+  staticUploads(req, res, next);
+});
 
 // Add logging middleware
 app.use((req, res, next) => {
@@ -234,65 +604,196 @@ try {
 }
 
 // Auth routes
-app.post('/api/auth/register', async (req, res) => {
+// Registration endpoint with security enhancements
+app.post('/api/auth/register', 
+  registerValidation,
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { email, password, firstName, lastName } = req.body;
+      const ip = getClientIP(req);
+      
+      // Check if email already exists
+      const existingUsers = await sql`
+        SELECT id FROM "User" WHERE email = ${email.toLowerCase()}
+      `;
+      
+      if (existingUsers.length > 0) {
+        logSuspiciousActivity(req, 'DUPLICATE_REGISTRATION', { email: email.toLowerCase() });
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+      
+      // Hash password with 12 rounds
+      const hashedPassword = await hashPassword(password);
+      const id = randomUUID();
+      
+      // Insert user into database
+      const user = await sql`
+        INSERT INTO "User" (id, email, password, "firstName", "lastName", "createdAt", "updatedAt")
+        VALUES (${id}, ${email.toLowerCase()}, ${hashedPassword}, ${firstName}, ${lastName}, NOW(), NOW())
+        RETURNING id, email, "firstName", "lastName", "profilePhoto", "createdAt"
+      `;
+      
+      // Generate tokens
+      const accessToken = generateAccessToken(user[0].id);
+      const refreshToken = generateRefreshToken(user[0].id);
+      
+      // Set refresh token as httpOnly cookie
+      setRefreshTokenCookie(res, refreshToken);
+      
+      // Log successful registration
+      logRegistration(req, user[0].email, user[0].id);
+      
+      // Return user and access token (refresh token is in cookie)
+      res.status(201).json({ 
+        user: user[0], 
+        token: accessToken,
+        message: 'Registration successful'
+      });
+    } catch (error) {
+      console.error('❌ Registration error:', error);
+      logSuspiciousActivity(req, 'REGISTRATION_ERROR', { error: error.message });
+      res.status(400).json({ error: 'Registration failed. Please try again.' });
+    }
+  }
+);
+
+// Login endpoint with security enhancements
+app.post('/api/auth/login',
+  loginRateLimiter,
+  loginValidation,
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      const normalizedEmail = email ? email.toLowerCase().trim() : '';
+      
+      // Check if this specific email address is locked due to too many failed attempts
+      const lockInfo = getLockInfo(normalizedEmail);
+      if (lockInfo && lockInfo.locked) {
+        logSuspiciousActivity(req, 'LOCKED_EMAIL_LOGIN_ATTEMPT', { email: normalizedEmail });
+        return res.status(429).json({ 
+          error: 'Too many failed login attempts for this email address. Please try again later.',
+          retryAfter: lockInfo.retryAfter,
+          lockedUntil: lockInfo.lockedUntil,
+        });
+      }
+      
+      // Find user by email (case-insensitive)
+      const users = await sql`
+        SELECT id, email, password, "firstName", "lastName", "profilePhoto"
+        FROM "User"
+        WHERE LOWER(email) = LOWER(${email})
+      `;
+      
+      // Always check password to prevent timing attacks
+      let isValid = false;
+      if (users.length > 0) {
+        isValid = await verifyPassword(password, users[0].password);
+      } else {
+        // Perform dummy hash comparison to prevent timing attacks
+        await bcrypt.compare(password, '$2a$12$dummy.hash.to.prevent.timing.attacks');
+      }
+      
+      if (users.length === 0 || !isValid) {
+        // Track failed attempt by email address (not IP)
+        trackFailedAttempt(normalizedEmail);
+        logFailedLogin(req, email, 'INVALID_CREDENTIALS');
+        
+        // Generic error message to prevent user enumeration
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+      
+      // Reset failed attempts for this email on successful login
+      resetFailedAttempts(normalizedEmail);
+      
+      // Generate tokens
+      const accessToken = generateAccessToken(users[0].id);
+      const refreshToken = generateRefreshToken(users[0].id);
+      
+      // Set refresh token as httpOnly cookie
+      setRefreshTokenCookie(res, refreshToken);
+      
+      // Log successful login
+      logSuccessfulLogin(req, users[0].email, users[0].id);
+      
+      // Return user without password
+      const { password: _, ...userWithoutPassword } = users[0];
+      res.json({ 
+        user: userWithoutPassword, 
+        token: accessToken,
+        message: 'Login successful'
+      });
+    } catch (error) {
+      console.error('❌ Login error:', error);
+      const normalizedEmail = req.body.email ? req.body.email.toLowerCase().trim() : '';
+      trackFailedAttempt(normalizedEmail);
+      logFailedLogin(req, req.body.email, 'SERVER_ERROR');
+      res.status(500).json({ error: 'Login failed. Please try again.' });
+    }
+  }
+);
+
+// Refresh token endpoint
+app.post('/api/auth/refresh', async (req, res) => {
   try {
-    console.log('📝 Registration request received:', req.body);
-    const { email, password, firstName, lastName } = req.body;
+    const refreshToken = req.cookies?.refreshToken;
     
-    // Validate input
-    if (!email || !password || !firstName || !lastName) {
-      console.log('❌ Validation failed - missing fields');
-      return res.status(400).json({ error: 'All fields are required' });
+    if (!refreshToken) {
+      return res.status(401).json({ error: 'Refresh token required' });
     }
     
-    console.log('🔐 Hashing password...');
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const id = randomUUID();
+    // Verify refresh token
+    const decoded = verifyRefreshToken(refreshToken);
     
-    console.log('💾 Inserting user into database...');
-    // Insert user using direct SQL
-    const user = await sql`
-      INSERT INTO "User" (id, email, password, "firstName", "lastName", "createdAt", "updatedAt")
-      VALUES (${id}, ${email}, ${hashedPassword}, ${firstName}, ${lastName}, NOW(), NOW())
-      RETURNING id, email, "firstName", "lastName", "profilePhoto", "createdAt"
-    `;
+    if (!decoded || decoded.type !== 'refresh') {
+      logTokenRefresh(req, null, false);
+      clearRefreshTokenCookie(res);
+      return res.status(403).json({ error: 'Invalid refresh token' });
+    }
     
-    console.log('✅ User created in database:', user[0].email);
+    // Generate new tokens (token rotation)
+    const newAccessToken = generateAccessToken(decoded.userId);
+    const newRefreshToken = generateRefreshToken(decoded.userId);
     
-    const token = jwt.sign({ userId: user[0].id }, process.env.JWT_SECRET || 'fallback-secret');
+    // Set new refresh token as httpOnly cookie
+    setRefreshTokenCookie(res, newRefreshToken);
     
-    res.status(201).json({ user: user[0], token });
+    // Log successful token refresh
+    logTokenRefresh(req, decoded.userId, true);
+    
+    res.json({ 
+      token: newAccessToken,
+      message: 'Token refreshed successfully'
+    });
   } catch (error) {
-    console.error('❌ Registration error details:', error);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    res.status(400).json({ error: error.message || 'Registration failed' });
+    console.error('❌ Token refresh error:', error);
+    logTokenRefresh(req, null, false);
+    clearRefreshTokenCookie(res);
+    res.status(500).json({ error: 'Token refresh failed' });
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+// Logout endpoint
+app.post('/api/auth/logout', (req, res) => {
   try {
-    const { email, password } = req.body;
+    // Clear refresh token cookie
+    clearRefreshTokenCookie(res);
     
-    // Find user using direct SQL
-    const users = await sql`
-      SELECT id, email, password, "firstName", "lastName", "profilePhoto"
-      FROM "User"
-      WHERE email = ${email}
-    `;
-    
-    if (users.length === 0 || !await bcrypt.compare(password, users[0].password)) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    // Log logout
+    const userId = req.user?.userId;
+    if (userId) {
+      logAuthEvent('LOGOUT', {
+        userId,
+        ip: getClientIP(req),
+        userAgent: getUserAgent(req),
+      });
     }
     
-    const token = jwt.sign({ userId: users[0].id }, process.env.JWT_SECRET || 'fallback-secret');
-    
-    // Return user without password
-    const { password: _, ...userWithoutPassword } = users[0];
-    res.json({ user: userWithoutPassword, token });
+    res.json({ message: 'Logged out successfully' });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(400).json({ error: error.message });
+    console.error('❌ Logout error:', error);
+    res.status(500).json({ error: 'Logout failed' });
   }
 });
 
@@ -324,7 +825,10 @@ app.put('/api/users/:id/profile', async (req, res) => {
     const { firstName, lastName, email, profilePhoto } = req.body;
 
     console.log('📝 Updating profile for user:', id);
-    console.log('📸 Profile photo:', profilePhoto ? 'provided' : 'not provided');
+    console.log('📸 Profile photo value:', profilePhoto);
+    console.log('📸 Profile photo type:', typeof profilePhoto);
+    console.log('📸 Is empty string?', profilePhoto === '');
+    console.log('📸 Is undefined?', profilePhoto === undefined);
 
     // Check if user exists
     const existingUser = await sql`
@@ -345,20 +849,51 @@ app.put('/api/users/:id/profile', async (req, res) => {
       }
     }
 
+    // Handle profilePhoto: 
+    // - If explicitly provided as empty string, set to null to remove photo
+    // - If provided with a value, use that value
+    // - If not provided (undefined), preserve existing value
+    let profilePhotoClause;
+    if (profilePhoto !== undefined) {
+      // profilePhoto was explicitly provided
+      if (profilePhoto === '' || profilePhoto === null) {
+        // Empty string or null means remove photo - set to null
+        console.log('🗑️ Removing profile photo (setting to NULL)');
+        profilePhotoClause = sql`NULL`;
+      } else {
+        // Use the provided URL
+        console.log('📸 Setting profile photo to:', profilePhoto);
+        profilePhotoClause = sql`${profilePhoto}`;
+      }
+    } else {
+      // Not provided, preserve existing value
+      console.log('📸 Preserving existing profile photo');
+      profilePhotoClause = sql`"profilePhoto"`;
+    }
+
+    // Convert undefined to null for postgres.js compatibility
+    // postgres.js doesn't allow undefined values in queries
+    const firstNameValue = firstName !== undefined ? firstName : null;
+    const lastNameValue = lastName !== undefined ? lastName : null;
+    const emailValue = email !== undefined ? email : null;
+    
     // Update the user
     const updatedUser = await sql`
       UPDATE "User"
       SET 
-        "firstName" = COALESCE(${firstName}, "firstName"),
-        "lastName" = COALESCE(${lastName}, "lastName"),
-        email = COALESCE(${email}, email),
-        "profilePhoto" = COALESCE(${profilePhoto}, "profilePhoto"),
+        "firstName" = COALESCE(${firstNameValue}, "firstName"),
+        "lastName" = COALESCE(${lastNameValue}, "lastName"),
+        email = COALESCE(${emailValue}, email),
+        "profilePhoto" = ${profilePhotoClause},
         "updatedAt" = NOW()
       WHERE id = ${id}
       RETURNING id, email, "firstName", "lastName", "profilePhoto", "createdAt", "updatedAt"
     `;
 
     console.log('✅ Profile updated:', updatedUser[0].email);
+    console.log('📸 Updated profile photo value:', updatedUser[0].profilePhoto);
+    console.log('📸 Updated profile photo is null?', updatedUser[0].profilePhoto === null);
+    
     res.json({ user: updatedUser[0], message: 'Profile updated successfully' });
   } catch (error) {
     console.error('❌ Update profile error:', error);
@@ -612,9 +1147,9 @@ app.delete('/api/users/:id', async (req, res) => {
 // Root route - only in development (production serves React app)
 // In production, static file serving handles the root route
 if (process.env.NODE_ENV !== 'production') {
-  app.get('/', (req, res) => {
-    res.json({ message: 'Travel API is running!' });
-  });
+app.get('/', (req, res) => {
+  res.json({ message: 'Travel API is running!' });
+});
 } else {
   // In production, log that root route is handled by static files
   console.log('📦 Root route (/) will be served by static files in production');
@@ -855,25 +1390,8 @@ async function initializeDatabase() {
 initializeDatabase();
 
 // Middleware to verify JWT token
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    console.log('❌ No token provided');
-    return res.status(401).json({ error: 'Access token required' });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret', (err, user) => {
-    if (err) {
-      console.log('❌ Invalid token:', err.message);
-      return res.status(403).json({ error: 'Invalid token' });
-    }
-    console.log('✅ Token verified for userId:', user.userId);
-    req.user = user;
-    next();
-  });
-};
+// authenticateToken is now imported from middleware/auth.js
+// Old implementation removed - using secure version from middleware
 
 // IMAGE UPLOAD ENDPOINT
 app.post('/api/upload/image', authenticateToken, upload.single('image'), async (req, res) => {
@@ -3250,10 +3768,30 @@ if (process.env.NODE_ENV === 'production') {
   }
 }
 
+// Development endpoint to reset rate limits (only in development)
+if (process.env.NODE_ENV !== 'production') {
+  app.post('/api/dev/reset-rate-limit', (req, res) => {
+    try {
+      res.json({ 
+        message: 'Rate limit store is in-memory. Restart server to reset, or wait for the time window to expire.',
+        note: 'The rate limit resets automatically after 15 minutes. Alternatively, restart your server to clear all rate limits immediately.',
+        tip: 'Set DISABLE_RATE_LIMIT=true in your .env file to completely disable rate limiting in development.'
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  console.log('🛠️  Development endpoint available: POST /api/dev/reset-rate-limit');
+}
+
 const PORT = process.env.PORT || 4001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log('📡 Using direct PostgreSQL connection');
   console.log(`🔗 API available at: http://localhost:${PORT}/api`);
   console.log(`🔍 Debug endpoint: http://localhost:${PORT}/api/debug/data`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`🛠️  Development: Set DISABLE_RATE_LIMIT=true in .env to completely disable rate limiting`);
+  }
 });

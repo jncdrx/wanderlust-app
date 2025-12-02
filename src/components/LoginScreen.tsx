@@ -51,13 +51,13 @@ export function LoginScreen({ onLogin, darkMode = false }: LoginScreenProps) {
     }))
   );
 
-  // Password requirements checker
+  // Password requirements checker - Updated to 12 characters minimum
   const getPasswordRequirements = () => {
-    const hasMinLength = password.length >= 8;
+    const hasMinLength = password.length >= 12;
     const hasUpperCase = /[A-Z]/.test(password);
     const hasLowerCase = /[a-z]/.test(password);
     const hasNumber = /[0-9]/.test(password);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>\[\]\\\/_+\-=~`]/.test(password);
     
     return {
       hasMinLength,
@@ -85,8 +85,8 @@ export function LoginScreen({ onLogin, darkMode = false }: LoginScreenProps) {
       if (!requirements.allMet) {
         errors.password = 'Password does not meet requirements';
       }
-    } else if (password.length < 4) {
-      errors.password = 'Password must be at least 4 characters';
+    } else if (password.length < 1) {
+      errors.password = 'Password is required';
     }
     
     if (isRegisterMode) {
@@ -150,7 +150,7 @@ export function LoginScreen({ onLogin, darkMode = false }: LoginScreenProps) {
         }, 3000);
       } else {
         const response = await apiClient.login({ email, password });
-        onLogin({ user: response.user, token: response.token });
+        onLogin({ user: response.user, token: response.accessToken });
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'An error occurred. Please try again.';
@@ -674,7 +674,7 @@ export function LoginScreen({ onLogin, darkMode = false }: LoginScreenProps) {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                               </svg>
                             )}
-                            <span>At least 8 characters</span>
+                            <span>At least 12 characters</span>
                           </div>
                           <div className={`flex items-center gap-1.5 text-[10px] ${
                             req.hasUpperCase 

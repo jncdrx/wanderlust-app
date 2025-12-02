@@ -47,7 +47,8 @@ type DestinationCreatePayload = {
 
 type AuthResponse = {
   user: UserSession;
-  token: string;
+  accessToken: string;
+  refreshToken: string;
 };
 
 export type UserSettings = {
@@ -111,11 +112,22 @@ const resolveApiBaseUrl = () => {
 const API_BASE_URL = resolveApiBaseUrl();
 
 const tokenKey = 'token';
+const LAST_LOGIN_KEY = 'lastLoginTimestamp';
 
 const getAuthHeaders = () => {
   if (typeof window === 'undefined') return {};
   const token = localStorage.getItem(tokenKey);
   return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+// Check if we recently logged in (within last 5 seconds)
+const isRecentLogin = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const lastLogin = localStorage.getItem(LAST_LOGIN_KEY);
+  if (!lastLogin) return false;
+  const loginTime = parseInt(lastLogin, 10);
+  const now = Date.now();
+  return (now - loginTime) < 5000; // 5 seconds
 };
 
 const parseJson = async (response: Response) => {
@@ -140,6 +152,24 @@ interface ApiErrorResponse {
 const handleResponse = async <T>(response: Response): Promise<T> => {
   const data = await parseJson(response);
   if (!response.ok) {
+    // Handle authentication errors (401/403) by clearing invalid tokens
+    // But don't clear if we just logged in (might be a race condition)
+    if (response.status === 401 || response.status === 403) {
+      // Only clear tokens if it's not a recent login (to avoid clearing valid tokens after login)
+      if (!isRecentLogin()) {
+        if (typeof window !== 'undefined') {
+          console.log('🔒 Clearing invalid authentication token');
+          localStorage.removeItem(tokenKey);
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          // Dispatch custom event to notify SessionContext
+          window.dispatchEvent(new CustomEvent('auth:logout', { detail: { reason: 'invalid_token' } }));
+        }
+      } else {
+        console.log('⚠️ Got 401/403 but ignoring (recent login, might be race condition)');
+      }
+    }
+    
     // Handle structured error responses from backend
     if (data && typeof data === 'object' && 'error' in data) {
       const errorData = data as ApiErrorResponse & { remainingBudget?: number; totalBudget?: number; totalSpent?: number };
@@ -153,7 +183,9 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
         remainingBudget?: number;
         totalBudget?: number;
         totalSpent?: number;
+        status?: number;
       };
+      error.status = response.status;
       if (errorData.field) error.field = errorData.field;
       if (errorData.maxLength !== undefined) error.maxLength = errorData.maxLength;
       if (errorData.currentLength !== undefined) error.currentLength = errorData.currentLength;
@@ -168,7 +200,9 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
       (data && typeof data === 'object' && 'error' in data && (data as { error?: string }).error) ||
       response.statusText ||
       'Request failed';
-    throw new Error(errorMessage);
+    const error = new Error(errorMessage) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
   return data as T;
 };
@@ -195,19 +229,84 @@ const request = async <T>(endpoint: string, config: RequestConfig = {}): Promise
 
 export const apiClient = {
   async register(userData: AuthPayload): Promise<AuthResponse> {
-    return request<AuthResponse>('/auth/register', {
+    // Server returns { user, token } but we expect { user, accessToken, refreshToken }
+    const response = await request<{ user: UserSession; token: string; refreshToken?: string }>('/auth/register', {
       method: 'POST',
       body: userData,
       auth: false,
     });
+    
+    // Map server response to expected format
+    const authResponse: AuthResponse = {
+      user: response.user,
+      accessToken: response.token,
+      refreshToken: response.refreshToken || '',
+    };
+    
+    // Store tokens
+    if (typeof window !== 'undefined') {
+      if (authResponse.accessToken) {
+        localStorage.setItem(tokenKey, authResponse.accessToken);
+        // Mark when we logged in to prevent clearing tokens too soon
+        localStorage.setItem(LAST_LOGIN_KEY, Date.now().toString());
+      }
+      if (authResponse.refreshToken) localStorage.setItem('refreshToken', authResponse.refreshToken);
+    }
+    
+    return authResponse;
+  },
+
+  async logout(): Promise<{ message: string }> {
+    const refreshToken = typeof window !== 'undefined' 
+      ? localStorage.getItem('refreshToken') 
+      : null;
+    
+    try {
+      await request<{ message: string }>('/auth/logout', {
+        method: 'POST',
+        body: refreshToken ? { refreshToken } : undefined,
+        auth: false,
+      });
+    } catch (error) {
+      // Continue with cleanup even if request fails
+    } finally {
+      // Clear tokens
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(tokenKey);
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem(LAST_LOGIN_KEY);
+      }
+    }
+    
+    return { message: 'Logged out successfully' };
   },
 
   async login(credentials: AuthPayload): Promise<AuthResponse> {
-    return request<AuthResponse>('/auth/login', {
+    // Server returns { user, token } but we expect { user, accessToken, refreshToken }
+    const response = await request<{ user: UserSession; token: string; refreshToken?: string }>('/auth/login', {
       method: 'POST',
       body: credentials,
       auth: false,
     });
+    
+    // Map server response to expected format
+    const authResponse: AuthResponse = {
+      user: response.user,
+      accessToken: response.token,
+      refreshToken: response.refreshToken || '',
+    };
+    
+    // Store tokens
+    if (typeof window !== 'undefined') {
+      if (authResponse.accessToken) {
+        localStorage.setItem(tokenKey, authResponse.accessToken);
+        // Mark when we logged in to prevent clearing tokens too soon
+        localStorage.setItem(LAST_LOGIN_KEY, Date.now().toString());
+      }
+      if (authResponse.refreshToken) localStorage.setItem('refreshToken', authResponse.refreshToken);
+    }
+    
+    return authResponse;
   },
 
   async fetchUserProfile(userId: string, token: string) {

@@ -68,12 +68,12 @@ export function DarkModeModal({ isOpen, onClose, darkMode, onToggle, currentUser
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+      // Allow body scrolling on mobile - don't lock it
+      // This allows both modal and background to scroll
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
     };
   }, [isOpen, isLoading, onClose]);
 
@@ -136,10 +136,14 @@ export function DarkModeModal({ isOpen, onClose, darkMode, onToggle, currentUser
           
           {/* Modal */}
           <div 
-            className="fixed inset-0 flex items-center justify-center p-4"
+            className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto"
             style={{
               zIndex: 10000,
               pointerEvents: 'none',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+              paddingTop: '2rem',
+              paddingBottom: '2rem',
             }}
             data-modal-content
           >
@@ -159,17 +163,18 @@ export function DarkModeModal({ isOpen, onClose, darkMode, onToggle, currentUser
                   ? '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
                   : '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
                 pointerEvents: 'auto',
-                maxHeight: '90vh',
+                maxHeight: '90dvh',
+                margin: 'auto',
               }}
               role="dialog"
               aria-modal="true"
               aria-labelledby="theme-settings-title"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
+        {/* Header */}
               <div className={`px-5 py-4 border-b ${darkMode ? 'border-white/20' : 'border-black/10'}`}>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
                     <div
                       className="p-2 rounded-xl"
                       style={{
@@ -188,11 +193,11 @@ export function DarkModeModal({ isOpen, onClose, darkMode, onToggle, currentUser
                       >
                         Theme Settings
                       </h2>
-                    </div>
-                  </div>
+            </div>
+          </div>
                   <motion.button
-                    onClick={onClose}
-                    disabled={isLoading}
+            onClick={onClose}
+            disabled={isLoading}
                     className={`p-2 rounded-xl transition-all ${
                       darkMode
                         ? 'hover:bg-white/10 disabled:opacity-50'
@@ -200,32 +205,37 @@ export function DarkModeModal({ isOpen, onClose, darkMode, onToggle, currentUser
                     }`}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                  >
+          >
                     <X size={18} className={darkMode ? 'text-white/70' : 'text-[#1a1a2e]/70'} />
                   </motion.button>
                 </div>
-              </div>
+        </div>
 
               {/* Content */}
-              <div className={`px-5 py-5 space-y-5 overflow-y-auto flex-1 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
+              <div className={`px-5 py-5 space-y-5 overflow-y-auto flex-1 min-h-0 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
                 style={{
                   WebkitOverflowScrolling: 'touch',
                   overscrollBehavior: 'contain',
+                  touchAction: 'pan-y',
+                }}
+                onTouchStart={(e) => {
+                  // Allow touch events to propagate for proper scrolling
+                  e.stopPropagation();
                 }}
               >
-                {/* Theme Options */}
+        {/* Theme Options */}
                 <div className="space-y-3">
-                  {themes.map((theme) => {
-                    const Icon = theme.icon;
-                    const isActive = darkMode ? theme.id === 'dark' : theme.id === 'light';
-                    
-                    return (
+          {themes.map((theme) => {
+            const Icon = theme.icon;
+            const isActive = darkMode ? theme.id === 'dark' : theme.id === 'light';
+            
+            return (
                       <motion.button
-                        key={theme.id}
-                        onClick={() => handleThemeSelect(theme.id)}
-                        disabled={isLoading}
+                key={theme.id}
+                onClick={() => handleThemeSelect(theme.id)}
+                disabled={isLoading}
                         className={`w-full p-4 rounded-xl border transition-all text-left ${
-                          isActive
+                  isActive
                             ? darkMode
                               ? 'bg-white/10 border-white/30'
                               : 'bg-[#4ecdc4]/10 border-[#4ecdc4]/40'
@@ -235,14 +245,14 @@ export function DarkModeModal({ isOpen, onClose, darkMode, onToggle, currentUser
                         } disabled:opacity-50`}
                         whileHover={!isLoading ? { scale: 1.02 } : {}}
                         whileTap={!isLoading ? { scale: 0.98 } : {}}
-                      >
-                        <div className="flex items-center gap-4">
+              >
+                <div className="flex items-center gap-4">
                           {/* Theme Preview Icon */}
                           <div className={`w-14 h-14 rounded-xl ${theme.preview} flex items-center justify-center flex-shrink-0`}>
                             <Icon className="text-white" size={24} />
-                          </div>
+                  </div>
 
-                          {/* Theme Info */}
+                  {/* Theme Info */}
                           <div className="flex-1 min-w-0">
                             <p className={`font-semibold mb-0.5 ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                               {theme.name}
@@ -250,11 +260,11 @@ export function DarkModeModal({ isOpen, onClose, darkMode, onToggle, currentUser
                             <p className={`text-sm ${darkMode ? 'text-white/60' : 'text-[#1a1a2e]/60'}`}>
                               {theme.description}
                             </p>
-                          </div>
+                  </div>
 
                           {/* Checkmark */}
-                          <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">
-                            {isActive && (
+                  <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">
+                    {isActive && (
                               <motion.div
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
@@ -263,16 +273,16 @@ export function DarkModeModal({ isOpen, onClose, darkMode, onToggle, currentUser
                                     ? 'bg-gradient-to-br from-[#50fa7b] to-[#8be9fd]'
                                     : 'bg-gradient-to-br from-[#4ecdc4] to-[#667eea]'
                                 }`}
-                              >
+                        >
                                 <CheckCircle2 size={18} className="text-white" />
                               </motion.div>
-                            )}
-                          </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
+                    )}
+                  </div>
                 </div>
+                      </motion.button>
+            );
+          })}
+        </div>
 
                 {/* App Settings Info */}
                 <div className={`p-4 rounded-xl border ${
@@ -286,19 +296,19 @@ export function DarkModeModal({ isOpen, onClose, darkMode, onToggle, currentUser
                       className={`mt-0.5 flex-shrink-0 ${darkMode ? 'text-white/60' : 'text-[#1a1a2e]/60'}`} 
                     />
                     <p className={`text-sm ${darkMode ? 'text-white/70' : 'text-[#1a1a2e]/70'}`}>
-                      {darkMode
+            {darkMode
                         ? 'Dark mode is active. The app will use darker colors to reduce eye strain.'
                         : 'Light mode is active. The app will use bright, vibrant colors.'}
-                    </p>
+          </p>
                   </div>
                 </div>
-              </div>
+        </div>
 
               {/* Footer */}
               <div className={`px-5 py-4 border-t ${darkMode ? 'border-white/20' : 'border-black/10'}`}>
                 <motion.button
-                  onClick={onClose}
-                  disabled={isLoading}
+          onClick={onClose}
+          disabled={isLoading}
                   className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
                     darkMode
                       ? 'bg-gradient-to-r from-[#50fa7b] to-[#8be9fd] text-[#0f0f1a] hover:from-[#50fa7b]/90 hover:to-[#8be9fd]/90'
@@ -306,19 +316,19 @@ export function DarkModeModal({ isOpen, onClose, darkMode, onToggle, currentUser
                   } disabled:opacity-50 flex items-center justify-center gap-2`}
                   whileHover={!isLoading ? { scale: 1.02 } : {}}
                   whileTap={!isLoading ? { scale: 0.98 } : {}}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Done'
-                  )}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Done'
+          )}
                 </motion.button>
               </div>
             </motion.div>
-          </div>
+    </div>
         </>
       )}
     </AnimatePresence>

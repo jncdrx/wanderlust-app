@@ -317,18 +317,18 @@ export function AddItineraryModal({ isOpen, onClose, onAdd, darkMode = false }: 
                   <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                     Main Destination <span className="text-red-400">*</span>
                   </label>
-                  <input
-                    type="text"
-                    value={destination}
-                    onChange={(e) => {
-                      setDestination(e.target.value);
-                      if (errors.destination) setErrors({ ...errors, destination: '' });
-                    }}
-                    onFocus={() => setFocusedField('destination')}
-                    onBlur={() => setFocusedField(null)}
-                    placeholder="e.g., Palawan, Philippines"
+                    <input
+                      type="text"
+                      value={destination}
+                      onChange={(e) => {
+                        setDestination(e.target.value);
+                        if (errors.destination) setErrors({ ...errors, destination: '' });
+                      }}
+                      onFocus={() => setFocusedField('destination')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="e.g., Palawan, Philippines"
                     className={getInputStyles('destination')}
-                  />
+                    />
                   {errors.destination && (
                     <p className="text-red-400 text-xs flex items-center gap-1.5">
                       <AlertCircle size={12} />
@@ -352,17 +352,17 @@ export function AddItineraryModal({ isOpen, onClose, onAdd, darkMode = false }: 
                     <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                       Start Date <span className="text-red-400">*</span>
                     </label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => {
-                        setStartDate(e.target.value);
-                        if (errors.startDate) setErrors({ ...errors, startDate: '' });
-                      }}
-                      onFocus={() => setFocusedField('startDate')}
-                      onBlur={() => setFocusedField(null)}
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => {
+                          setStartDate(e.target.value);
+                          if (errors.startDate) setErrors({ ...errors, startDate: '' });
+                        }}
+                        onFocus={() => setFocusedField('startDate')}
+                        onBlur={() => setFocusedField(null)}
                       className={`${getInputStyles('startDate')} text-xs`}
-                    />
+                      />
                     {errors.startDate && (
                       <p className="text-red-400 text-xs flex items-center gap-1.5">
                         <AlertCircle size={12} />
@@ -376,15 +376,15 @@ export function AddItineraryModal({ isOpen, onClose, onAdd, darkMode = false }: 
                     <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                       End Date <span className="text-red-400">*</span>
                     </label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      onFocus={() => setFocusedField('endDate')}
-                      onBlur={() => setFocusedField(null)}
-                      min={startDate}
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        onFocus={() => setFocusedField('endDate')}
+                        onBlur={() => setFocusedField(null)}
+                        min={startDate}
                       className={`${getInputStyles('endDate')} text-xs`}
-                    />
+                      />
                     {errors.endDate && (
                       <p className="text-red-400 text-xs flex items-center gap-1.5">
                         <AlertCircle size={12} />
@@ -421,15 +421,15 @@ export function AddItineraryModal({ isOpen, onClose, onAdd, darkMode = false }: 
                     <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                       Budget
                     </label>
-                    <input
-                      type="text"
-                      value={budget}
-                      onChange={(e) => setBudget(e.target.value)}
-                      onFocus={() => setFocusedField('budget')}
-                      onBlur={() => setFocusedField(null)}
-                      placeholder="₱100,000"
+                      <input
+                        type="text"
+                        value={budget}
+                        onChange={(e) => setBudget(e.target.value)}
+                        onFocus={() => setFocusedField('budget')}
+                        onBlur={() => setFocusedField(null)}
+                        placeholder="₱100,000"
                       className={getInputStyles('budget')}
-                    />
+                      />
                     <p className={`text-xs ${darkMode ? 'text-white/50' : 'text-[#1a1a2e]/50'}`}>
                       Estimated total cost
                     </p>
@@ -440,16 +440,16 @@ export function AddItineraryModal({ isOpen, onClose, onAdd, darkMode = false }: 
                     <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                       Travelers
                     </label>
-                    <input
-                      type="number"
-                      value={companions}
-                      onChange={(e) => setCompanions(parseInt(e.target.value) || 1)}
-                      onFocus={() => setFocusedField('companions')}
-                      onBlur={() => setFocusedField(null)}
-                      min="1"
-                      max="50"
+                      <input
+                        type="number"
+                        value={companions}
+                        onChange={(e) => setCompanions(parseInt(e.target.value) || 1)}
+                        onFocus={() => setFocusedField('companions')}
+                        onBlur={() => setFocusedField(null)}
+                        min="1"
+                        max="50"
                       className={getInputStyles('companions')}
-                    />
+                      />
                     <p className={`text-xs ${darkMode ? 'text-white/50' : 'text-[#1a1a2e]/50'}`}>
                       Including yourself
                     </p>
@@ -461,15 +461,15 @@ export function AddItineraryModal({ isOpen, onClose, onAdd, darkMode = false }: 
                   <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                     Trip Notes
                   </label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    onFocus={() => setFocusedField('notes')}
-                    onBlur={() => setFocusedField(null)}
-                    placeholder="Add special plans, reminders, or things to pack..."
-                    rows={3}
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      onFocus={() => setFocusedField('notes')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="Add special plans, reminders, or things to pack..."
+                      rows={3}
                     className={`${getInputStyles('notes')} resize-none`}
-                  />
+                    />
                   <p className={`text-xs flex items-center gap-1.5 ${darkMode ? 'text-white/50' : 'text-[#1a1a2e]/50'}`}>
                     <Info size={11} />
                     Optional notes for your trip

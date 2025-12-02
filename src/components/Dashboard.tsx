@@ -167,15 +167,60 @@ export function Dashboard({
                 </span>
               </div>
 
-              {/* Greeting */}
-              <h1 
-                className={`text-2xl sm:text-3xl font-bold tracking-tight mb-1 ${
-                  darkMode ? 'text-white' : 'text-[#1a1a2e]'
-                }`}
-                style={{ fontFamily: "'Outfit', sans-serif" }}
-              >
-                {getGreeting()}, {getFirstName()}
-              </h1>
+              {/* Greeting with Profile Photo */}
+              <div className="flex items-center gap-3 mb-1">
+                {/* Profile Photo or Avatar */}
+                {currentUser?.profilePhoto ? (
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden border-2"
+                    style={{
+                      borderColor: darkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+                    }}
+                  >
+                    <img 
+                      src={currentUser.profilePhoto} 
+                      alt={getFirstName()}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback to initials if image fails to load
+                        e.currentTarget.style.display = 'none';
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          const initials = getFirstName().charAt(0).toUpperCase();
+                          parent.innerHTML = `<span class="text-white text-lg font-bold" style="font-family: 'Outfit', sans-serif">${initials}</span>`;
+                          parent.style.background = darkMode 
+                            ? 'linear-gradient(135deg, #50fa7b 0%, #8be9fd 100%)'
+                            : 'linear-gradient(135deg, #4ecdc4 0%, #45b7d1 100%)';
+                        }
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div 
+                    className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 border-2"
+                    style={{
+                      background: darkMode 
+                        ? 'linear-gradient(135deg, #50fa7b 0%, #8be9fd 100%)'
+                        : 'linear-gradient(135deg, #4ecdc4 0%, #45b7d1 100%)',
+                      borderColor: darkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+                    }}
+                  >
+                    <span className="text-white text-lg font-bold" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                      {getFirstName().charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                
+                <div className="flex-1 min-w-0">
+                  <h1 
+                    className={`text-2xl sm:text-3xl font-bold tracking-tight ${
+                      darkMode ? 'text-white' : 'text-[#1a1a2e]'
+                    }`}
+                    style={{ fontFamily: "'Outfit', sans-serif" }}
+                  >
+                    {getGreeting()}, {getFirstName()}
+                  </h1>
+                </div>
+              </div>
               <p className={`text-sm ${darkMode ? 'text-white/50' : 'text-[#1a1a2e]/50'}`}>
                 Here's your travel summary
               </p>

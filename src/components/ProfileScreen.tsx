@@ -319,18 +319,18 @@ export function ProfileScreen({
                   />
                 </div>
               ) : (
-                <div 
+              <div 
                   className="w-20 h-20 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{
-                    background: darkMode 
-                      ? 'linear-gradient(135deg, #50fa7b 0%, #8be9fd 100%)'
-                      : 'linear-gradient(135deg, #4ecdc4 0%, #45b7d1 100%)',
-                  }}
-                >
+                style={{
+                  background: darkMode 
+                    ? 'linear-gradient(135deg, #50fa7b 0%, #8be9fd 100%)'
+                    : 'linear-gradient(135deg, #4ecdc4 0%, #45b7d1 100%)',
+                }}
+              >
                   <span className="text-white text-2xl font-bold" style={{ fontFamily: "'Outfit', sans-serif" }}>
-                    {getInitials()}
-                  </span>
-                </div>
+                  {getInitials()}
+                </span>
+              </div>
               )}
 
               {/* Name and Email */}
@@ -344,8 +344,8 @@ export function ProfileScreen({
                 <div className="flex items-center gap-1.5">
                   <Mail size={12} className={darkMode ? 'text-white/40' : 'text-[#1a1a2e]/40'} />
                   <p className={`text-xs ${darkMode ? 'text-white/50' : 'text-[#1a1a2e]/50'}`}>
-                    {getEmail()}
-                  </p>
+                  {getEmail()}
+                </p>
                 </div>
               </div>
             </div>
@@ -414,7 +414,7 @@ export function ProfileScreen({
               label="Email Settings"
               onClick={() => setEmailSettingsOpen(true)}
             />
-            <div className={`h-px mx-4 ${darkMode ? 'bg-white/8' : 'bg-black/5'}`} />
+                    <div className={`h-px mx-4 ${darkMode ? 'bg-white/8' : 'bg-black/5'}`} />
             <SettingRow
               icon={Lock}
               label="Change Password"
@@ -459,8 +459,8 @@ export function ProfileScreen({
                 </p>
               </div>
               <div className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${
-                darkMode
-                  ? 'bg-[#50fa7b]'
+                darkMode 
+                  ? 'bg-[#50fa7b]' 
                   : 'bg-black/20'
               }`}>
                 <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
@@ -600,12 +600,25 @@ export function ProfileScreen({
         onSave={handleSaveProfile}
         onProfileUpdated={(user) => {
           console.log('Profile updated:', user);
+          // Reset photo error state when profile is updated
           setProfilePhotoError(false);
-          updateUser({
+          
+          // Update user - if profilePhoto is null/empty, it will clear the photo
+          const updateData: any = {
             firstName: user.firstName,
             lastName: user.lastName,
-            profilePhoto: user.profilePhoto,
-          });
+          };
+          
+          // Explicitly set profilePhoto - null/undefined/empty string will clear it
+          if (user.profilePhoto) {
+            updateData.profilePhoto = user.profilePhoto;
+          } else {
+            // Explicitly clear the photo by setting to null
+            updateData.profilePhoto = null;
+          }
+          
+          updateUser(updateData);
+          
           if (onUpdateUserName && user.firstName) {
             const newName = user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName;
             onUpdateUserName(newName);

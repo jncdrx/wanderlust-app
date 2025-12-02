@@ -401,19 +401,19 @@ export function AddDestinationModal({ isOpen, onClose, onAdd, editingDestination
                       </span>
                     )}
                   </div>
-                  <input
-                    type="text"
-                    value={location}
-                    onChange={(e) => {
-                      setLocation(e.target.value);
-                      if (errors.location) setErrors({ ...errors, location: '' });
-                    }}
-                    onFocus={() => setFocusedField('location')}
-                    onBlur={() => setFocusedField(null)}
-                    placeholder="e.g., Albay, Philippines"
+                    <input
+                      type="text"
+                      value={location}
+                      onChange={(e) => {
+                        setLocation(e.target.value);
+                        if (errors.location) setErrors({ ...errors, location: '' });
+                      }}
+                      onFocus={() => setFocusedField('location')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="e.g., Albay, Philippines"
                     className={getInputStyles('location')}
-                    maxLength={MAX_DESTINATION_LOCATION_LENGTH}
-                  />
+                      maxLength={MAX_DESTINATION_LOCATION_LENGTH}
+                    />
                   {errors.location && (
                     <p className="text-red-400 text-xs flex items-center gap-1.5">
                       <AlertCircle size={12} />

@@ -39,12 +39,12 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+      // Allow body scrolling on mobile - don't lock it
+      // This allows both modal and background to scroll
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
     };
   }, [isOpen, currentScreen, onClose]);
 
@@ -86,7 +86,7 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
       {/* Header */}
       <div className={`px-5 py-4 border-b ${darkMode ? 'border-white/20' : 'border-black/10'}`}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
             <div
               className="p-2 rounded-xl"
               style={{
@@ -122,13 +122,18 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
       </div>
 
       {/* Content */}
-      <div className={`px-5 py-5 space-y-3 overflow-y-auto flex-1 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
+      <div className={`px-5 py-5 space-y-3 overflow-y-auto flex-1 min-h-0 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
         style={{
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'contain',
+          touchAction: 'pan-y',
+        }}
+        onTouchStart={(e) => {
+          // Allow touch events to propagate for proper scrolling
+          e.stopPropagation();
         }}
       >
-        {/* Menu Items */}
+      {/* Menu Items */}
         <motion.button
           onClick={() => setCurrentScreen('privacy')}
           className={`w-full p-4 rounded-xl border transition-all flex items-center justify-between ${
@@ -193,14 +198,14 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
           }`}>
             App Settings
           </p>
-          
-          {/* Version */}
+
+      {/* Version */}
           <div className={`p-4 rounded-xl border ${
             darkMode
               ? 'bg-white/5 border-white/10'
               : 'bg-black/[0.02] border-black/10'
           }`}>
-            <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between">
               <span className={darkMode ? 'text-white/70' : 'text-[#1a1a2e]/70'}>Version</span>
               <span className={darkMode ? 'text-white' : 'text-[#1a1a2e]'}>1.0.0</span>
             </div>
@@ -211,7 +216,7 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
       {/* Footer */}
       <div className={`px-5 py-4 border-t ${darkMode ? 'border-white/20' : 'border-black/10'}`}>
         <motion.button
-          onClick={onClose}
+        onClick={onClose}
           className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
             darkMode
               ? 'bg-gradient-to-r from-[#50fa7b] to-[#8be9fd] text-[#0f0f1a] hover:from-[#50fa7b]/90 hover:to-[#8be9fd]/90'
@@ -219,8 +224,8 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
           }`}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-        >
-          Close
+      >
+        Close
         </motion.button>
       </div>
     </>
@@ -231,15 +236,15 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
       {/* Header */}
       <div className={`px-5 py-4 border-b ${darkMode ? 'border-white/20' : 'border-black/10'}`}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
             <motion.button
-              onClick={() => setCurrentScreen('main')}
+            onClick={() => setCurrentScreen('main')}
               className={`p-2 rounded-xl transition-all ${
                 darkMode ? 'hover:bg-white/10' : 'hover:bg-black/5'
               }`}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-            >
+          >
               <ArrowLeft size={18} className={darkMode ? 'text-white/70' : 'text-[#1a1a2e]/70'} />
             </motion.button>
             <div>
@@ -265,10 +270,15 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
       </div>
 
       {/* Content */}
-      <div className={`px-5 py-5 overflow-y-auto flex-1 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
+      <div className={`px-5 py-5 overflow-y-auto flex-1 min-h-0 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
         style={{
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'contain',
+          touchAction: 'pan-y',
+        }}
+        onTouchStart={(e) => {
+          // Allow touch events to propagate for proper scrolling
+          e.stopPropagation();
         }}
       >
         <div className={`p-4 rounded-xl border ${
@@ -280,30 +290,30 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
             Your Privacy Matters
           </h3>
           <div className={`space-y-4 text-sm ${darkMode ? 'text-white/80' : 'text-[#1a1a2e]/80'}`}>
-            <p>
-              Your privacy is important to us. This Travel Itinerary Management app is designed with your privacy in mind.
-            </p>
+          <p>
+            Your privacy is important to us. This Travel Itinerary Management app is designed with your privacy in mind.
+          </p>
             <div>
               <strong className={darkMode ? 'text-white' : 'text-[#1a1a2e]'}>Data Storage:</strong>
               <p className="mt-1">
                 All your travel data, including destinations, itineraries, photos, and preferences are stored locally on your device.
-              </p>
+          </p>
             </div>
             <div>
               <strong className={darkMode ? 'text-white' : 'text-[#1a1a2e]'}>No Third-Party Sharing:</strong>
               <p className="mt-1">
                 We do not share your personal information with third parties. Your travel plans remain private.
-              </p>
+          </p>
             </div>
             <div>
               <strong className={darkMode ? 'text-white' : 'text-[#1a1a2e]'}>Photos:</strong>
               <p className="mt-1">
                 All photos you upload are stored locally and are not transmitted to any external servers.
-              </p>
+          </p>
             </div>
             <p className={`italic ${darkMode ? 'text-white/60' : 'text-[#1a1a2e]/60'}`}>
-              Last updated: October 16, 2025
-            </p>
+            Last updated: October 16, 2025
+          </p>
           </div>
         </div>
       </div>
@@ -311,7 +321,7 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
       {/* Footer */}
       <div className={`px-5 py-4 border-t ${darkMode ? 'border-white/20' : 'border-black/10'}`}>
         <motion.button
-          onClick={() => setCurrentScreen('main')}
+        onClick={() => setCurrentScreen('main')}
           className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
             darkMode
               ? 'bg-gradient-to-r from-[#50fa7b] to-[#8be9fd] text-[#0f0f1a] hover:from-[#50fa7b]/90 hover:to-[#8be9fd]/90'
@@ -319,8 +329,8 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
           }`}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-        >
-          Back
+      >
+        Back
         </motion.button>
       </div>
     </>
@@ -331,15 +341,15 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
       {/* Header */}
       <div className={`px-5 py-4 border-b ${darkMode ? 'border-white/20' : 'border-black/10'}`}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
             <motion.button
-              onClick={() => setCurrentScreen('main')}
+            onClick={() => setCurrentScreen('main')}
               className={`p-2 rounded-xl transition-all ${
                 darkMode ? 'hover:bg-white/10' : 'hover:bg-black/5'
               }`}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-            >
+          >
               <ArrowLeft size={18} className={darkMode ? 'text-white/70' : 'text-[#1a1a2e]/70'} />
             </motion.button>
             <div>
@@ -365,10 +375,15 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
       </div>
 
       {/* Content */}
-      <div className={`px-5 py-5 overflow-y-auto flex-1 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
+      <div className={`px-5 py-5 overflow-y-auto flex-1 min-h-0 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
         style={{
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'contain',
+          touchAction: 'pan-y',
+        }}
+        onTouchStart={(e) => {
+          // Allow touch events to propagate for proper scrolling
+          e.stopPropagation();
         }}
       >
         <div className={`p-4 rounded-xl border ${
@@ -380,42 +395,42 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
             Terms & Conditions
           </h3>
           <div className={`space-y-4 text-sm ${darkMode ? 'text-white/80' : 'text-[#1a1a2e]/80'}`}>
-            <p>
-              By using this Travel Itinerary Management app, you agree to the following terms and conditions.
-            </p>
+          <p>
+            By using this Travel Itinerary Management app, you agree to the following terms and conditions.
+          </p>
             <div>
               <strong className={darkMode ? 'text-white' : 'text-[#1a1a2e]'}>Demo Application:</strong>
               <p className="mt-1">
                 This is a demonstration application created to showcase travel management features. It is not intended for production use with real personal data.
-              </p>
+          </p>
             </div>
             <div>
               <strong className={darkMode ? 'text-white' : 'text-[#1a1a2e]'}>Usage:</strong>
               <p className="mt-1">
                 You may use this app to plan and organize your travel itineraries, manage destinations, and store travel photos.
-              </p>
+          </p>
             </div>
             <div>
               <strong className={darkMode ? 'text-white' : 'text-[#1a1a2e]'}>Acceptable Use:</strong>
               <p className="mt-1">
                 You agree not to use this app for any unlawful purposes or in any way that could damage, disable, or impair the application.
-              </p>
+          </p>
             </div>
             <div>
               <strong className={darkMode ? 'text-white' : 'text-[#1a1a2e]'}>Modifications:</strong>
               <p className="mt-1">
                 We reserve the right to modify these terms at any time. Continued use of the app constitutes acceptance of modified terms.
-              </p>
+          </p>
             </div>
             <div>
               <strong className={darkMode ? 'text-white' : 'text-[#1a1a2e]'}>Disclaimer:</strong>
               <p className="mt-1">
                 This app is provided "as is" without warranties of any kind.
-              </p>
+          </p>
             </div>
             <p className={`italic ${darkMode ? 'text-white/60' : 'text-[#1a1a2e]/60'}`}>
-              Last updated: October 16, 2025
-            </p>
+            Last updated: October 16, 2025
+          </p>
           </div>
         </div>
       </div>
@@ -423,7 +438,7 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
       {/* Footer */}
       <div className={`px-5 py-4 border-t ${darkMode ? 'border-white/20' : 'border-black/10'}`}>
         <motion.button
-          onClick={() => setCurrentScreen('main')}
+        onClick={() => setCurrentScreen('main')}
           className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
             darkMode
               ? 'bg-gradient-to-r from-[#50fa7b] to-[#8be9fd] text-[#0f0f1a] hover:from-[#50fa7b]/90 hover:to-[#8be9fd]/90'
@@ -431,8 +446,8 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
           }`}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-        >
-          Back
+      >
+        Back
         </motion.button>
       </div>
     </>
@@ -443,15 +458,15 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
       {/* Header */}
       <div className={`px-5 py-4 border-b ${darkMode ? 'border-white/20' : 'border-black/10'}`}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
             <motion.button
-              onClick={() => setCurrentScreen('main')}
+            onClick={() => setCurrentScreen('main')}
               className={`p-2 rounded-xl transition-all ${
                 darkMode ? 'hover:bg-white/10' : 'hover:bg-black/5'
               }`}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-            >
+          >
               <ArrowLeft size={18} className={darkMode ? 'text-white/70' : 'text-[#1a1a2e]/70'} />
             </motion.button>
             <div>
@@ -477,10 +492,15 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
       </div>
 
       {/* Content */}
-      <div className={`px-5 py-5 overflow-y-auto flex-1 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
+      <div className={`px-5 py-5 overflow-y-auto flex-1 min-h-0 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
         style={{
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'contain',
+          touchAction: 'pan-y',
+        }}
+        onTouchStart={(e) => {
+          // Allow touch events to propagate for proper scrolling
+          e.stopPropagation();
         }}
       >
         <div className="space-y-5">
@@ -494,8 +514,8 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
               Get Help
             </h3>
             <p className={`text-sm ${darkMode ? 'text-white/80' : 'text-[#1a1a2e]/80'}`}>
-              Need help with the Travel Itinerary Management app? We're here to assist you!
-            </p>
+            Need help with the Travel Itinerary Management app? We're here to assist you!
+          </p>
           </div>
 
           {/* Contact Us */}
@@ -509,7 +529,7 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
             </h3>
             <div className={`space-y-1 text-sm ${darkMode ? 'text-white/80' : 'text-[#1a1a2e]/80'}`}>
               <p>Email: johncedrix9@gmail.com</p>
-              <p>Phone: +63 9998143486</p>
+            <p>Phone: +63 9998143486</p>
             </div>
           </div>
 
@@ -534,7 +554,7 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
       {/* Footer */}
       <div className={`px-5 py-4 border-t ${darkMode ? 'border-white/20' : 'border-black/10'}`}>
         <motion.button
-          onClick={() => setCurrentScreen('main')}
+        onClick={() => setCurrentScreen('main')}
           className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
             darkMode
               ? 'bg-gradient-to-r from-[#50fa7b] to-[#8be9fd] text-[#0f0f1a] hover:from-[#50fa7b]/90 hover:to-[#8be9fd]/90'
@@ -542,8 +562,8 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
           }`}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-        >
-          Back
+      >
+        Back
         </motion.button>
       </div>
     </>
@@ -590,10 +610,14 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
           
           {/* Modal */}
           <div 
-            className="fixed inset-0 flex items-center justify-center p-4"
+            className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto"
             style={{
               zIndex: 10000,
               pointerEvents: 'none',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+              paddingTop: '2rem',
+              paddingBottom: '2rem',
             }}
             data-modal-content
           >
@@ -613,16 +637,17 @@ export function AboutModal({ isOpen, onClose, darkMode: propDarkMode }: AboutMod
                   ? '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
                   : '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
                 pointerEvents: 'auto',
-                maxHeight: '90vh',
+                maxHeight: '90dvh',
+                margin: 'auto',
               }}
               role="dialog"
               aria-modal="true"
               aria-labelledby="about-title"
               onClick={(e) => e.stopPropagation()}
             >
-              {renderContent()}
+        {renderContent()}
             </motion.div>
-          </div>
+    </div>
         </>
       )}
     </AnimatePresence>

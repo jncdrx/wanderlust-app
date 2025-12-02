@@ -73,6 +73,21 @@ export function SessionProvider({ children }: PropsWithChildren) {
     localStorage.removeItem(USER_KEY);
   };
 
+  // Listen for auth logout events (triggered when token is invalid)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleAuthLogout = () => {
+      console.log('🔄 Authentication token invalid, logging out...');
+      logout();
+    };
+    
+    window.addEventListener('auth:logout', handleAuthLogout);
+    return () => {
+      window.removeEventListener('auth:logout', handleAuthLogout);
+    };
+  }, []);
+
   const updateUser = (updates: Partial<UserSession>) => {
     if (currentUser) {
       const updatedUser = { ...currentUser, ...updates };

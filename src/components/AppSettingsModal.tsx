@@ -138,12 +138,12 @@ export function AppSettingsModal({ isOpen, onClose, darkMode: propDarkMode }: Ap
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+      // Allow body scrolling on mobile - don't lock it
+      // This allows both modal and background to scroll
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
     };
   }, [isOpen, isSaving, settingsLoading, onClose]);
 
@@ -241,7 +241,7 @@ export function AppSettingsModal({ isOpen, onClose, darkMode: propDarkMode }: Ap
         await updateAppSettings({ autoBackup: enabled });
         centeredToast.success('Auto backup updated', {
           description: enabled ? 'Auto backup is now enabled.' : 'Auto backup is now disabled.',
-        });
+    });
       } catch (error) {
         centeredToast.error('Failed to save auto backup setting');
         setAutoBackup(appSettings.autoBackup); // Revert on error
@@ -284,10 +284,14 @@ export function AppSettingsModal({ isOpen, onClose, darkMode: propDarkMode }: Ap
           
           {/* Modal */}
           <div 
-            className="fixed inset-0 flex items-center justify-center p-4"
+            className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto"
             style={{
               zIndex: 10000,
               pointerEvents: 'none',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+              paddingTop: '2rem',
+              paddingBottom: '2rem',
             }}
             data-modal-content
           >
@@ -307,14 +311,15 @@ export function AppSettingsModal({ isOpen, onClose, darkMode: propDarkMode }: Ap
                   ? '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
                   : '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
                 pointerEvents: 'auto',
-                maxHeight: '90vh',
+                maxHeight: '90dvh',
+                margin: 'auto',
               }}
               role="dialog"
               aria-modal="true"
               aria-labelledby="app-settings-title"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
+        {/* Header */}
               <div className={`px-5 py-4 border-b ${darkMode ? 'border-white/20' : 'border-black/10'}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -339,7 +344,7 @@ export function AppSettingsModal({ isOpen, onClose, darkMode: propDarkMode }: Ap
                     </div>
                   </div>
                   <motion.button
-                    onClick={onClose}
+            onClick={onClose}
                     disabled={isSaving || settingsLoading}
                     className={`p-2 rounded-xl transition-all ${
                       darkMode
@@ -348,117 +353,122 @@ export function AppSettingsModal({ isOpen, onClose, darkMode: propDarkMode }: Ap
                     }`}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                  >
+          >
                     <X size={18} className={darkMode ? 'text-white/70' : 'text-[#1a1a2e]/70'} />
                   </motion.button>
                 </div>
-              </div>
+        </div>
 
               {/* Content */}
-              <div className={`px-5 py-5 space-y-5 overflow-y-auto flex-1 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
+              <div className={`px-5 py-5 space-y-5 overflow-y-auto flex-1 min-h-0 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
                 style={{
                   WebkitOverflowScrolling: 'touch',
                   overscrollBehavior: 'contain',
+                  touchAction: 'pan-y',
+                }}
+                onTouchStart={(e) => {
+                  // Allow touch events to propagate for proper scrolling
+                  e.stopPropagation();
                 }}
               >
-                {/* Language */}
+          {/* Language */}
                 <div className="space-y-3">
                   <label className={`text-sm font-medium flex items-center gap-2 ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                     <Globe size={16} className={darkMode ? 'text-white/60' : 'text-[#1a1a2e]/60'} />
-                    Language
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['English', 'Spanish', 'French', 'German'].map((lang) => (
+              Language
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {['English', 'Spanish', 'French', 'German'].map((lang) => (
                       <motion.button
-                        key={lang}
+                  key={lang}
                         onClick={() => handleLanguageChange(lang)}
                         disabled={isSaving || settingsLoading}
                         className={`py-3 px-4 rounded-xl border transition-all text-sm font-medium ${
-                          language === lang
+                    language === lang
                             ? darkMode
                               ? 'bg-gradient-to-r from-[#50fa7b] to-[#8be9fd] border-white/30 text-[#0f0f1a]'
                               : 'bg-gradient-to-r from-[#4ecdc4] to-[#667eea] border-[#4ecdc4]/40 text-white'
                             : darkMode
                               ? 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 disabled:opacity-50'
                               : 'bg-black/[0.02] border-black/10 text-[#1a1a2e]/70 hover:bg-black/[0.05] disabled:opacity-50'
-                        }`}
+                  }`}
                         whileHover={!isSaving && !settingsLoading ? { scale: 1.02 } : {}}
                         whileTap={!isSaving && !settingsLoading ? { scale: 0.98 } : {}}
-                      >
-                        {lang}
+                >
+                  {lang}
                       </motion.button>
-                    ))}
-                  </div>
-                </div>
+              ))}
+            </div>
+          </div>
 
-                {/* Date Format */}
+          {/* Date Format */}
                 <div className="space-y-3">
                   <label className={`text-sm font-medium flex items-center gap-2 ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                     <Calendar size={16} className={darkMode ? 'text-white/60' : 'text-[#1a1a2e]/60'} />
-                    Date Format
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'].map((format) => (
+              Date Format
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'].map((format) => (
                       <motion.button
-                        key={format}
+                  key={format}
                         onClick={() => handleDateFormatChange(format)}
                         disabled={isSaving || settingsLoading}
                         className={`py-3 px-4 rounded-xl border transition-all text-sm font-medium ${
-                          dateFormat === format
+                    dateFormat === format
                             ? darkMode
                               ? 'bg-gradient-to-r from-[#50fa7b] to-[#8be9fd] border-white/30 text-[#0f0f1a]'
                               : 'bg-gradient-to-r from-[#4ecdc4] to-[#667eea] border-[#4ecdc4]/40 text-white'
                             : darkMode
                               ? 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 disabled:opacity-50'
                               : 'bg-black/[0.02] border-black/10 text-[#1a1a2e]/70 hover:bg-black/[0.05] disabled:opacity-50'
-                        }`}
+                  }`}
                         whileHover={!isSaving && !settingsLoading ? { scale: 1.02 } : {}}
                         whileTap={!isSaving && !settingsLoading ? { scale: 0.98 } : {}}
-                      >
-                        {format}
+                >
+                  {format}
                       </motion.button>
-                    ))}
-                  </div>
-                </div>
+              ))}
+            </div>
+          </div>
 
-                {/* Map View */}
+          {/* Map View */}
                 <div className="space-y-3">
                   <label className={`text-sm font-medium flex items-center gap-2 ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                     <MapPin size={16} className={darkMode ? 'text-white/60' : 'text-[#1a1a2e]/60'} />
-                    Default Map View
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['Standard', 'Satellite', 'Terrain'].map((view) => (
+              Default Map View
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {['Standard', 'Satellite', 'Terrain'].map((view) => (
                       <motion.button
-                        key={view}
+                  key={view}
                         onClick={() => handleMapViewChange(view)}
                         disabled={isSaving || settingsLoading}
                         className={`py-3 px-4 rounded-xl border transition-all text-sm font-medium ${
-                          mapView === view
+                    mapView === view
                             ? darkMode
                               ? 'bg-gradient-to-r from-[#50fa7b] to-[#8be9fd] border-white/30 text-[#0f0f1a]'
                               : 'bg-gradient-to-r from-[#4ecdc4] to-[#667eea] border-[#4ecdc4]/40 text-white'
                             : darkMode
                               ? 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 disabled:opacity-50'
                               : 'bg-black/[0.02] border-black/10 text-[#1a1a2e]/70 hover:bg-black/[0.05] disabled:opacity-50'
-                        }`}
+                  }`}
                         whileHover={!isSaving && !settingsLoading ? { scale: 1.02 } : {}}
                         whileTap={!isSaving && !settingsLoading ? { scale: 0.98 } : {}}
-                      >
-                        {view}
+                >
+                  {view}
                       </motion.button>
-                    ))}
-                  </div>
-                </div>
+              ))}
+            </div>
+          </div>
 
-                {/* Auto Backup */}
+          {/* Auto Backup */}
                 <div className={`p-4 rounded-xl border ${
                   darkMode
                     ? 'bg-white/5 border-white/10'
                     : 'bg-black/[0.02] border-black/10'
                 }`}>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
                       <div
                         className="p-2 rounded-xl"
                         style={{
@@ -468,16 +478,16 @@ export function AppSettingsModal({ isOpen, onClose, darkMode: propDarkMode }: Ap
                         }}
                       >
                         <Cloud size={18} className={darkMode ? 'text-[#50fa7b]' : 'text-[#4ecdc4]'} />
-                      </div>
-                      <div>
+              </div>
+              <div>
                         <p className={`font-semibold ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                           Auto Backup
                         </p>
                         <p className={`text-sm ${darkMode ? 'text-white/60' : 'text-[#1a1a2e]/60'}`}>
                           Backup data automatically
                         </p>
-                      </div>
-                    </div>
+              </div>
+            </div>
                     <PremiumToggle
                       enabled={autoBackup}
                       onChange={handleAutoBackupChange}
@@ -487,7 +497,7 @@ export function AppSettingsModal({ isOpen, onClose, darkMode: propDarkMode }: Ap
                       aria-label="Toggle auto backup"
                     />
                   </div>
-                </div>
+          </div>
 
                 {/* Storage Usage */}
                 <div className={`p-4 rounded-xl border ${
@@ -498,11 +508,11 @@ export function AppSettingsModal({ isOpen, onClose, darkMode: propDarkMode }: Ap
                   <p className={`font-semibold mb-3 ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                     Storage Usage
                   </p>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
                       <span className={darkMode ? 'text-white/70' : 'text-[#1a1a2e]/70'}>Photos</span>
                       <span className={darkMode ? 'text-white' : 'text-[#1a1a2e]'}>2.4 MB</span>
-                    </div>
+              </div>
                     <div className={`w-full h-2 rounded-full overflow-hidden ${
                       darkMode ? 'bg-white/20' : 'bg-black/10'
                     }`}>
@@ -514,13 +524,13 @@ export function AppSettingsModal({ isOpen, onClose, darkMode: propDarkMode }: Ap
                         }`}
                         style={{ width: '2.4%' }}
                       />
-                    </div>
-                    <div className="flex justify-between text-sm">
+              </div>
+              <div className="flex justify-between text-sm">
                       <span className={darkMode ? 'text-white/70' : 'text-[#1a1a2e]/70'}>Total Used</span>
                       <span className={darkMode ? 'text-white' : 'text-[#1a1a2e]'}>2.4 / 100 MB</span>
-                    </div>
-                  </div>
-                </div>
+            </div>
+          </div>
+        </div>
 
                 {/* Privacy & Terms */}
                 <div className={`p-4 rounded-xl border ${
@@ -543,7 +553,7 @@ export function AppSettingsModal({ isOpen, onClose, darkMode: propDarkMode }: Ap
               {/* Footer */}
               <div className={`px-5 py-4 border-t ${darkMode ? 'border-white/20' : 'border-black/10'}`}>
                 <motion.button
-                  onClick={handleSave}
+            onClick={handleSave}
                   disabled={isSaving || settingsLoading}
                   className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
                     darkMode
@@ -562,9 +572,9 @@ export function AppSettingsModal({ isOpen, onClose, darkMode: propDarkMode }: Ap
                     'Done'
                   )}
                 </motion.button>
-              </div>
+        </div>
             </motion.div>
-          </div>
+    </div>
         </>
       )}
     </AnimatePresence>

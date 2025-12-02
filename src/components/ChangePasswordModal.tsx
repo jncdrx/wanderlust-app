@@ -56,12 +56,12 @@ export function ChangePasswordModal({ isOpen, onClose, currentUser, darkMode = f
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+      // Allow body scrolling on mobile - don't lock it
+      // This allows both modal and background to scroll
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
     };
   }, [isOpen, isLoading]);
 
@@ -170,10 +170,14 @@ export function ChangePasswordModal({ isOpen, onClose, currentUser, darkMode = f
           
           {/* Modal */}
           <div 
-            className="fixed inset-0 flex items-center justify-center p-4"
+            className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto"
             style={{
               zIndex: 10000,
               pointerEvents: 'none',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+              paddingTop: '2rem',
+              paddingBottom: '2rem',
             }}
             data-modal-content
           >
@@ -183,7 +187,7 @@ export function ChangePasswordModal({ isOpen, onClose, currentUser, darkMode = f
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', duration: 0.4, bounce: 0.15 }}
-              className={`w-full max-w-sm rounded-2xl overflow-hidden ${
+              className={`w-full max-w-sm rounded-2xl overflow-hidden flex flex-col ${
                 darkMode
                   ? 'bg-[#0f172a] border border-white/30'
                   : 'bg-white border border-black/10'
@@ -193,6 +197,8 @@ export function ChangePasswordModal({ isOpen, onClose, currentUser, darkMode = f
                   ? '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
                   : '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
                 pointerEvents: 'auto',
+                maxHeight: '90dvh',
+                margin: 'auto',
               }}
               role="dialog"
               aria-modal="true"
@@ -244,7 +250,18 @@ export function ChangePasswordModal({ isOpen, onClose, currentUser, darkMode = f
           </div>
 
           {/* Content */}
-          <div className="px-5 py-5 space-y-4">
+          <div 
+            className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0"
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+              touchAction: 'pan-y',
+            }}
+            onTouchStart={(e) => {
+              // Allow touch events to propagate for proper scrolling
+              e.stopPropagation();
+            }}
+          >
             {/* Current Password */}
             <div className="space-y-1.5">
               <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>

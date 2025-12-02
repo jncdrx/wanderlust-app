@@ -120,9 +120,9 @@ export default function App() {
       <SessionProvider>
         <QueryClientProvider client={queryClient}>
           <SettingsProvider>
-            <DataProvider>
-              <AppContent />
-            </DataProvider>
+          <DataProvider>
+            <AppContent />
+          </DataProvider>
           </SettingsProvider>
         </QueryClientProvider>
       </SessionProvider>

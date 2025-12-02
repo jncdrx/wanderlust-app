@@ -315,12 +315,12 @@ export function EmailSettingsModal({ isOpen, onClose, currentUser, darkMode = fa
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+      // Allow body scrolling on mobile - don't lock it
+      // This allows both modal and background to scroll
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
     };
   }, [isOpen, isLoading, isSendingVerification]);
 
@@ -497,10 +497,14 @@ export function EmailSettingsModal({ isOpen, onClose, currentUser, darkMode = fa
           
           {/* Modal */}
           <div 
-            className="fixed inset-0 flex items-center justify-center p-4"
+            className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto"
             style={{
               zIndex: 10000,
               pointerEvents: 'none',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+              paddingTop: '2rem',
+              paddingBottom: '2rem',
             }}
             data-modal-content
           >
@@ -520,7 +524,8 @@ export function EmailSettingsModal({ isOpen, onClose, currentUser, darkMode = fa
                   ? '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
                   : '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
                 pointerEvents: 'auto',
-                maxHeight: '90vh',
+                maxHeight: '90dvh',
+                margin: 'auto',
               }}
               role="dialog"
               aria-modal="true"
@@ -573,11 +578,15 @@ export function EmailSettingsModal({ isOpen, onClose, currentUser, darkMode = fa
 
           {/* Content - Scrollable */}
           <div 
-            className={`px-5 py-5 space-y-6 overflow-y-auto flex-1 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
+            className={`px-5 py-5 space-y-6 overflow-y-auto flex-1 min-h-0 ${darkMode ? 'scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent' : 'scrollbar-thin scrollbar-thumb-black/20 scrollbar-track-transparent'}`}
             style={{
-              maxHeight: 'calc(90vh - 180px)',
               WebkitOverflowScrolling: 'touch',
               overscrollBehavior: 'contain',
+              touchAction: 'pan-y',
+            }}
+            onTouchStart={(e) => {
+              // Allow touch events to propagate for proper scrolling
+              e.stopPropagation();
             }}
           >
             {isFetching ? (
@@ -601,23 +610,23 @@ export function EmailSettingsModal({ isOpen, onClose, currentUser, darkMode = fa
                   {/* Primary Email */}
                   <div className="space-y-2">
                     <label className={`text-sm font-medium flex items-center gap-2 ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
-                      Primary email
-                    </label>
+                    Primary email
+                  </label>
                     <div className={`p-4 rounded-xl border ${
-                      darkMode 
-                        ? 'bg-white/5 border-white/10' 
-                        : 'bg-black/[0.02] border-black/10'
-                    }`}>
+                    darkMode 
+                      ? 'bg-white/5 border-white/10' 
+                      : 'bg-black/[0.02] border-black/10'
+                  }`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <Mail 
+                      <Mail 
                             size={18} 
-                            className={darkMode ? 'text-white/60' : 'text-[#1a1a2e]/60'} 
-                          />
+                        className={darkMode ? 'text-white/60' : 'text-[#1a1a2e]/60'} 
+                      />
                           <div>
                             <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
-                              {currentUser?.email || 'No email on file'}
-                            </span>
+                        {currentUser?.email || 'No email on file'}
+                      </span>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <Shield size={12} className={darkMode ? 'text-green-400' : 'text-green-600'} />
                               <span className={`text-xs ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
@@ -630,39 +639,39 @@ export function EmailSettingsModal({ isOpen, onClose, currentUser, darkMode = fa
                     </div>
                   </div>
 
-                  {/* Change Email Section */}
+                {/* Change Email Section */}
                   <div className="space-y-3 pt-2 border-t border-white/10 dark:border-white/10 border-black/10">
                     <label className={`text-sm font-medium flex items-center gap-2 ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
-                      Change email
-                    </label>
-                    
-                    <AnimatePresence>
-                      {verificationSent && (
-                        <motion.div
+                    Change email
+                  </label>
+                  
+                  <AnimatePresence>
+                    {verificationSent && (
+                      <motion.div
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
                           className={`p-4 rounded-xl border flex items-start gap-3 ${
-                            darkMode
+                          darkMode
                               ? 'bg-teal-500/20 border-teal-500/40'
-                              : 'bg-teal-50 border-teal-200'
-                          }`}
-                        >
+                            : 'bg-teal-50 border-teal-200'
+                        }`}
+                      >
                           <CheckCircle2 size={20} className={`mt-0.5 flex-shrink-0 ${darkMode ? 'text-teal-400' : 'text-teal-600'}`} />
-                          <div className="flex-1">
+                        <div className="flex-1">
                             <p className={`text-sm font-semibold ${darkMode ? 'text-teal-400' : 'text-teal-700'}`}>
                               Verification link sent successfully!
-                            </p>
+                          </p>
                             <p className={`text-xs mt-1 ${darkMode ? 'text-white/80' : 'text-teal-600/90'}`}>
                               Check <span className="font-medium">{verificationEmail}</span> for the confirmation link
-                            </p>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                     <div className="space-y-4">
-                      <div>
+                    <div>
                         <div className="flex items-center gap-2 mb-2">
                           <label className={`text-xs font-medium ${darkMode ? 'text-white/80' : 'text-[#1a1a2e]/80'}`}>
                             New email
@@ -708,12 +717,12 @@ export function EmailSettingsModal({ isOpen, onClose, currentUser, darkMode = fa
                         ) : (
                           <p className={`text-[11px] mt-1.5 flex items-center gap-1.5 ${darkMode ? 'text-white/50' : 'text-[#1a1a2e]/50'}`}>
                             <Info size={11} />
-                            A confirmation link will be sent to this address
-                          </p>
+                        A confirmation link will be sent to this address
+                      </p>
                         )}
-                      </div>
+                    </div>
 
-                      <div>
+                    <div>
                         <div className="flex items-center gap-2 mb-2">
                           <label className={`text-xs font-medium ${darkMode ? 'text-white/80' : 'text-[#1a1a2e]/80'}`}>
                             Current password
@@ -735,22 +744,22 @@ export function EmailSettingsModal({ isOpen, onClose, currentUser, darkMode = fa
                             </div>
                           </div>
                         </div>
-                        <div className="relative">
-                          <input
-                            type={showPassword ? 'text' : 'password'}
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
                             placeholder="Enter your current password"
-                            value={currentPassword}
-                            onChange={(e) => {
-                              setCurrentPassword(e.target.value);
+                          value={currentPassword}
+                          onChange={(e) => {
+                            setCurrentPassword(e.target.value);
                               setPasswordError('');
-                              if (verificationSent) setVerificationSent(false);
-                            }}
-                            onFocus={() => setFocusedField('currentPassword')}
+                            if (verificationSent) setVerificationSent(false);
+                          }}
+                          onFocus={() => setFocusedField('currentPassword')}
                             onBlur={() => {
                               setFocusedField(null);
                               if (currentPassword) validateEmailChange();
                             }}
-                            disabled={isSendingVerification || isLoading}
+                          disabled={isSendingVerification || isLoading}
                             className={`w-full pl-4 pr-12 py-3 rounded-xl text-sm transition-all duration-200 outline-none ${
                               passwordError
                                 ? darkMode
@@ -766,78 +775,78 @@ export function EmailSettingsModal({ isOpen, onClose, currentUser, darkMode = fa
                             } ${darkMode ? 'placeholder:text-white/30' : 'placeholder:text-[#1a1a2e]/40'}`}
                             aria-invalid={!!passwordError}
                             aria-describedby={passwordError ? 'password-error' : undefined}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            disabled={isSendingVerification || isLoading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          disabled={isSendingVerification || isLoading}
                             className={`absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors group ${
                               darkMode ? 'text-white/40 hover:text-white/70 hover:bg-white/10' : 'text-[#1a1a2e]/40 hover:text-[#1a1a2e]/70 hover:bg-black/5'
-                            }`}
-                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          }`}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
                             title={showPassword ? 'Hide password' : 'Show password'}
-                          >
-                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        </div>
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                         {passwordError && (
                           <p id="password-error" className="text-red-400 text-xs flex items-center gap-1.5 mt-1.5">
                             <AlertCircle size={12} />
                             {passwordError}
                           </p>
                         )}
-                      </div>
+                    </div>
 
-                      <motion.button
-                        onClick={handleSendVerification}
+                    <motion.button
+                      onClick={handleSendVerification}
                         disabled={!newEmail.trim() || !currentPassword.trim() || !!emailError || !!passwordError || isSendingVerification || isLoading}
                         className={`w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all ${
                           newEmail.trim() && currentPassword.trim() && !emailError && !passwordError && !isSendingVerification && !isLoading
-                            ? darkMode
-                              ? 'bg-[#8be9fd] text-[#0f0f1a] hover:bg-[#8be9fd]/90'
-                              : 'bg-[#667eea] text-white hover:bg-[#667eea]/90'
-                            : darkMode
-                              ? 'bg-white/10 text-white/30 cursor-not-allowed'
-                              : 'bg-black/10 text-[#1a1a2e]/30 cursor-not-allowed'
-                        }`}
-                        style={{
+                          ? darkMode
+                            ? 'bg-[#8be9fd] text-[#0f0f1a] hover:bg-[#8be9fd]/90'
+                            : 'bg-[#667eea] text-white hover:bg-[#667eea]/90'
+                          : darkMode
+                            ? 'bg-white/10 text-white/30 cursor-not-allowed'
+                            : 'bg-black/10 text-[#1a1a2e]/30 cursor-not-allowed'
+                      }`}
+                      style={{
                           boxShadow: newEmail.trim() && currentPassword.trim() && !emailError && !passwordError && !isSendingVerification && !isLoading
-                            ? (darkMode
-                                ? '0 4px 14px rgba(139, 233, 253, 0.3)'
-                                : '0 4px 14px rgba(102, 126, 234, 0.3)')
-                            : 'none',
-                        }}
+                          ? (darkMode
+                              ? '0 4px 14px rgba(139, 233, 253, 0.3)'
+                              : '0 4px 14px rgba(102, 126, 234, 0.3)')
+                          : 'none',
+                      }}
                         whileHover={newEmail.trim() && currentPassword.trim() && !emailError && !passwordError && !isSendingVerification && !isLoading ? { scale: 1.02, y: -1 } : {}}
                         whileTap={newEmail.trim() && currentPassword.trim() && !emailError && !passwordError && !isSendingVerification && !isLoading ? { scale: 0.98 } : {}}
                         title="Send verification email to the new address"
-                      >
-                        {isSendingVerification ? (
-                          <>
-                            <Loader2 size={16} className="animate-spin" />
+                    >
+                      {isSendingVerification ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
                             Sending verification...
-                          </>
-                        ) : (
+                        </>
+                      ) : (
                           <>
                             <Mail size={16} />
                             Send verification to new email
                           </>
-                        )}
-                      </motion.button>
+                      )}
+                    </motion.button>
                     </div>
                   </div>
                 </div>
 
                 {/* Notification Preferences Card */}
                 <div className={`rounded-2xl border p-5 space-y-4 ${
-                  darkMode 
-                    ? 'bg-white/5 border-white/10' 
-                    : 'bg-black/[0.02] border-black/10'
-                }`}>
+                      darkMode 
+                        ? 'bg-white/5 border-white/10' 
+                        : 'bg-black/[0.02] border-black/10'
+                    }`}>
                   <div className="flex items-center justify-between">
                     <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-[#1a1a2e]'}`}>
                       Email Notifications
                     </h3>
-                  </div>
+                    </div>
                   
                   <div className="space-y-3">
                     {/* Trip Updates */}
@@ -868,7 +877,7 @@ export function EmailSettingsModal({ isOpen, onClose, currentUser, darkMode = fa
                       iconColor={darkMode ? '#50fa7b' : '#4ecdc4'}
                       accentColor={darkMode ? '#50fa7b' : '#4ecdc4'}
                       iconGradient={darkMode
-                        ? 'linear-gradient(135deg, rgba(80, 250, 123, 0.2) 0%, rgba(139, 233, 253, 0.15) 100%)'
+                              ? 'linear-gradient(135deg, rgba(80, 250, 123, 0.2) 0%, rgba(139, 233, 253, 0.15) 100%)'
                         : 'linear-gradient(135deg, rgba(78, 205, 196, 0.2) 0%, rgba(102, 126, 234, 0.15) 100%)'}
                       darkMode={darkMode}
                       tooltip="Receive important trip reminders and deadlines"
@@ -885,7 +894,7 @@ export function EmailSettingsModal({ isOpen, onClose, currentUser, darkMode = fa
                       iconColor={darkMode ? '#ff79c6' : '#ff6b6b'}
                       accentColor={darkMode ? '#ff79c6' : '#ff6b6b'}
                       iconGradient={darkMode
-                        ? 'linear-gradient(135deg, rgba(255, 121, 198, 0.2) 0%, rgba(189, 147, 249, 0.15) 100%)'
+                              ? 'linear-gradient(135deg, rgba(255, 121, 198, 0.2) 0%, rgba(189, 147, 249, 0.15) 100%)'
                         : 'linear-gradient(135deg, rgba(255, 107, 107, 0.2) 0%, rgba(102, 126, 234, 0.15) 100%)'}
                       darkMode={darkMode}
                       tooltip="Receive travel tips, deals, and inspiration"

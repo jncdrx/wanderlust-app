@@ -105,6 +105,16 @@ export function DataProvider({ children }: PropsWithChildren) {
     refetchInterval: enabled ? 3000 : false, // Refetch every 3 seconds for real-time feel
     refetchOnWindowFocus: true, // Refetch when user returns to app
     refetchOnMount: true,
+    retry: (failureCount, error) => {
+      // Don't retry on authentication errors (401/403)
+      if (error && typeof error === 'object' && 'status' in error) {
+        const status = (error as { status?: number }).status;
+        if (status === 401 || status === 403) {
+          return false;
+        }
+      }
+      return failureCount < 3;
+    },
   });
 
   const {
@@ -127,6 +137,16 @@ export function DataProvider({ children }: PropsWithChildren) {
     refetchInterval: enabled ? 3000 : false,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
+    retry: (failureCount, error) => {
+      // Don't retry on authentication errors (401/403)
+      if (error && typeof error === 'object' && 'status' in error) {
+        const status = (error as { status?: number }).status;
+        if (status === 401 || status === 403) {
+          return false;
+        }
+      }
+      return failureCount < 3;
+    },
   });
 
   const {
@@ -141,6 +161,16 @@ export function DataProvider({ children }: PropsWithChildren) {
     refetchInterval: enabled ? 3000 : false,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
+    retry: (failureCount, error) => {
+      // Don't retry on authentication errors (401/403)
+      if (error && typeof error === 'object' && 'status' in error) {
+        const status = (error as { status?: number }).status;
+        if (status === 401 || status === 403) {
+          return false;
+        }
+      }
+      return failureCount < 3;
+    },
   });
 
   useEffect(() => {
