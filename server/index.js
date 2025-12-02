@@ -466,13 +466,12 @@ if (renderUrl) {
 
 const secureCorsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests) in development
-    if (!origin && process.env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
-    
+    // Allow requests with no origin (same-origin requests, static assets, favicon, etc.)
+    // These are typically same-origin requests that don't send Origin header
     if (!origin) {
-      return callback(new Error('CORS: Origin required in production'));
+      // In production, allow same-origin requests (no origin = same origin)
+      // This is safe because same-origin requests don't need CORS
+      return callback(null, true);
     }
     
     // Check if origin is in trusted list
